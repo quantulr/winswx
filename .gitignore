@@ -12,7 +12,13 @@ dist
 dist-ssr
 *.local
 
+#sidecar bin
 *.exe
+
+#vitepress
+docs/.vitepress/dist
+docs/.vitepress/cache
+.gitignore
 
 # Editor directories and files
 .vscode/*
