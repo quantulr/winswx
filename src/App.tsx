@@ -21,7 +21,6 @@ const winswVer = async () => {
     console.log(line);
   });
   await command.spawn();
-
 };
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
