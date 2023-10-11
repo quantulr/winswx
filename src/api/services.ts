@@ -14,7 +14,7 @@ const checkServicesDirExist = async () => {
 };
 
 interface Service {
-  name?: string;
+  name: string;
   path: string;
   status: string;
 }
@@ -22,7 +22,8 @@ interface Service {
 const serviceStatus = async (path: string) => {
   const command = Command.sidecar("bin/winsw", ["status", path]);
   const child = await command.execute();
-  if (child.code !== 0) {
+
+  if (child.code === -1) {
     throw new Error(child.stdout);
   }
   return child.stdout.replace(/[\x00-\x1F\x7F-\x9F]+/g, "");
@@ -52,11 +53,25 @@ const fetcher = async (): Promise<Service[]> => {
 };
 
 export const useServicesList = () => {
-  const { data, isLoading, error } = useSWR("/services", fetcher);
-  console.log(data);
+  const { data, isLoading, error, mutate } = useSWR("/services", fetcher);
+  console.log(error);
+
   return {
     services: data,
     isLoading,
     isError: error,
+    mutate,
   };
+};
+
+export const installService = async (path: string) => {
+  const command = Command.sidecar("bin/winsw", ["install", path]);
+  const child = await command.execute();
+  return child.stdout;
+};
+
+export const winswCommand = async (command: string, path: string) => {
+  const cmd = Command.sidecar("bin/winsw", [command, path]);
+  const child = await cmd.execute();
+  return child.stdout;
 };

@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Table,
   TableContainer,
@@ -8,11 +9,20 @@ import {
   Thead,
   Tr,
 } from "@chakra-ui/react";
-import { useServicesList } from "../api/services.ts";
-import { MdInstallDesktop } from "react-icons/md";
+import {
+  installService,
+  useServicesList,
+  winswCommand,
+} from "../api/services.ts";
+import { MdDeleteOutline, MdInstallDesktop } from "react-icons/md";
+import { VscDebugStart } from "react-icons/vsc";
+import { HiOutlineStop } from "react-icons/hi";
 
 const Services = () => {
-  const { services } = useServicesList();
+  const { services, isLoading, isError, mutate } = useServicesList();
+  if (isError) {
+    return <div>error</div>;
+  }
   return (
     <div>
       <TableContainer>
@@ -28,11 +38,62 @@ const Services = () => {
             {services?.map((service) => (
               <Tr key={service.path}>
                 <Td>{service.name}</Td>
-                <Td>{service.status}</Td>
                 <Td>
-                  <Button size={"xs"} leftIcon={<MdInstallDesktop />}>
-                    安装
-                  </Button>
+                  <Badge>{service.status}</Badge>
+                </Td>
+                <Td>
+                  {service.status === "NonExistent" && (
+                    <Button
+                      size={"xs"}
+                      leftIcon={<MdInstallDesktop />}
+                      onClick={() => {
+                        installService(service.path).then(() => {
+                          mutate();
+                        });
+                      }}
+                    >
+                      安装
+                    </Button>
+                  )}
+                  {service.status === "Inactive (stopped)" && (
+                    <Button
+                      size={"xs"}
+                      leftIcon={<MdDeleteOutline />}
+                      onClick={() => {
+                        winswCommand("uninstall", service.path).then(() => {
+                          mutate();
+                        });
+                      }}
+                    >
+                      卸载
+                    </Button>
+                  )}
+                  {service.status === "Inactive (stopped)" && (
+                    <Button
+                      size={"xs"}
+                      leftIcon={<VscDebugStart />}
+                      onClick={() => {
+                        winswCommand("start", service.path).then(() => {
+                          mutate();
+                        });
+                      }}
+                    >
+                      启动
+                    </Button>
+                  )}
+                  {service.status === "Active (running)" && (
+                    <Button
+                      size={"xs"}
+                      leftIcon={<HiOutlineStop />}
+                      onClick={() => {
+                        winswCommand("stop", service.path).then(() => {
+                          mutate();
+                        });
+                      }}
+                    >
+                      停止
+                    </Button>
+                  )}
                 </Td>
               </Tr>
             ))}
