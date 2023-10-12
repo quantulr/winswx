@@ -1,7 +1,14 @@
-import { BaseDirectory, createDir, exists, readDir } from "@tauri-apps/api/fs";
+import {
+  BaseDirectory,
+  createDir,
+  exists,
+  readDir,
+  writeTextFile,
+} from "@tauri-apps/api/fs";
 import useSWR from "swr";
-import { join } from "@tauri-apps/api/path";
+import { dirname, join } from "@tauri-apps/api/path";
 import { Command } from "@tauri-apps/api/shell";
+import { XMLBuilder } from "fast-xml-parser";
 
 const checkServicesDirExist = async () => {
   const isExist = await exists("service", { dir: BaseDirectory.AppData });
@@ -74,4 +81,28 @@ export const winswCommand = async (command: string, path: string) => {
   const cmd = Command.sidecar("bin/winsw", [command, path]);
   const child = await cmd.execute();
   return child.stdout;
+};
+
+export interface ServiceDetail {
+  id: string;
+  executable: string;
+  arguments?: string;
+}
+
+export const writeService = async (content: ServiceDetail, path: string) => {
+  const xmlBuilder = new XMLBuilder({
+    format: true,
+  });
+  const xmlStr = xmlBuilder.build({
+    service: content,
+  });
+
+  const parentDir = await dirname(path);
+  const isExists = await exists(parentDir);
+  if (!isExists) {
+    await createDir(await join(parentDir), {
+      recursive: true,
+    });
+  }
+  await writeTextFile(path, xmlStr);
 };

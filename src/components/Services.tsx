@@ -18,6 +18,7 @@ import {
   MdAddCircleOutline,
   MdDeleteOutline,
   MdInstallDesktop,
+  MdOutlineRefresh,
 } from "react-icons/md";
 import { VscDebugStart } from "react-icons/vsc";
 import { HiOutlineStop } from "react-icons/hi";
@@ -125,6 +126,20 @@ const Services = () => {
                         }}
                       >
                         停止
+                      </Button>
+                    )}
+                    {service.status != "NonExistent" && (
+                      <Button
+                        className={styles.operationButton}
+                        size={"xs"}
+                        leftIcon={<MdOutlineRefresh />}
+                        onClick={() => {
+                          winswCommand("refresh", service.path).then(() => {
+                            void mutate();
+                          });
+                        }}
+                      >
+                        刷新
                       </Button>
                     )}
                   </div>

@@ -9,13 +9,15 @@ import {
   InputRightElement,
   useToast,
 } from "@chakra-ui/react";
-import { omitBy, isNil } from "lodash-es";
+import { isNil, omitBy } from "lodash-es";
 import { MdArrowBack } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { CgSelectR } from "react-icons/cg";
-import { dialog, invoke } from "@tauri-apps/api";
+import { dialog } from "@tauri-apps/api";
+import { ServiceDetail, writeService } from "../api/services.ts";
+import { appDataDir, join } from "@tauri-apps/api/path";
 
 const ServiceSchema = Yup.object().shape({
   id: Yup.string().required("请填写服务id"),
@@ -32,13 +34,16 @@ const CreateService = () => {
       arguments: "",
     },
     validationSchema: ServiceSchema,
-    onSubmit: (values) => {
-      invoke("write_xml", {
-        content: JSON.stringify(
-          omitBy(values, (value) => isNil(value) || value === ""),
-        ),
-        path: "tes",
-      });
+    onSubmit: async (values) => {
+      const appDataPath = await appDataDir();
+      const servicePath = await join(
+        appDataPath,
+        "services",
+        values.id,
+        `${values.id}.xml`,
+      );
+      const service = omitBy(values, (value) => isNil(value) || value === "");
+      await writeService(service as unknown as ServiceDetail, servicePath);
       toast({
         title: JSON.stringify(
           omitBy(values, (value) => isNil(value) || value === ""),
