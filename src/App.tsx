@@ -5,7 +5,13 @@ import router from "./router.tsx";
 
 function App() {
   return (
-    <ChakraProvider>
+    <ChakraProvider
+      toastOptions={{
+        defaultOptions: {
+          position: "top",
+        },
+      }}
+    >
       <RouterProvider router={router} />
     </ChakraProvider>
   );

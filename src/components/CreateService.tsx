@@ -9,12 +9,13 @@ import {
   InputRightElement,
   useToast,
 } from "@chakra-ui/react";
+import { omitBy, isNil } from "lodash-es";
 import { MdArrowBack } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { CgSelectR } from "react-icons/cg";
-import { dialog } from "@tauri-apps/api";
+import { dialog, invoke } from "@tauri-apps/api";
 
 const ServiceSchema = Yup.object().shape({
   id: Yup.string().required("请填写服务id"),
@@ -28,12 +29,20 @@ const CreateService = () => {
     initialValues: {
       id: "",
       executable: "",
+      arguments: "",
     },
     validationSchema: ServiceSchema,
     onSubmit: (values) => {
+      invoke("write_xml", {
+        content: JSON.stringify(
+          omitBy(values, (value) => isNil(value) || value === ""),
+        ),
+        path: "tes",
+      });
       toast({
-        position: "top",
-        title: values.id,
+        title: JSON.stringify(
+          omitBy(values, (value) => isNil(value) || value === ""),
+        ),
       });
     },
   });
@@ -57,12 +66,16 @@ const CreateService = () => {
               onChange={formik.handleChange}
               value={formik.values.id}
             />
-            <FormErrorMessage>{formik.errors.id}</FormErrorMessage>
+            {formik.errors.id && formik.touched.id ? (
+              <FormErrorMessage>{formik.errors.id}</FormErrorMessage>
+            ) : (
+              <div className={"h-[25px]"}></div>
+            )}
           </FormControl>
           <FormControl
             isInvalid={!!formik.errors.executable && formik.touched.executable}
           >
-            <FormLabel>可执行文件</FormLabel>
+            <FormLabel>可执行文件路径</FormLabel>
             <InputGroup>
               <Input
                 id={"executable"}
@@ -85,19 +98,45 @@ const CreateService = () => {
                         ],
                       })
                       .then((file) => {
-                        toast({
-                          position: "top",
-                          title: file,
-                        });
+                        if (file) {
+                          formik.setFieldValue("executable", file);
+                        }
                       });
                   }}
                 />
               </InputRightElement>
             </InputGroup>
-            <FormErrorMessage>{formik.errors.executable}</FormErrorMessage>
+
+            {formik.errors.executable && formik.touched.executable ? (
+              <FormErrorMessage>{formik.errors.executable}</FormErrorMessage>
+            ) : (
+              <div className={"h-[25px]"}></div>
+            )}
+          </FormControl>
+          <FormControl
+            isInvalid={!!formik.errors.arguments && formik.touched.arguments}
+          >
+            <FormLabel>参数</FormLabel>
+            <Input
+              id={"arguments"}
+              onChange={formik.handleChange}
+              value={formik.values.arguments}
+            />
+            {formik.errors.arguments && formik.touched.arguments ? (
+              <FormErrorMessage>{formik.errors.arguments}</FormErrorMessage>
+            ) : (
+              <div className={"h-[25px]"}></div>
+            )}
           </FormControl>
           <div className={"flex justify-center items-center mt-2"}>
-            <Button type={"submit"}>新增</Button>
+            <Button
+              size={"sm"}
+              px={10}
+              type={"submit"}
+              colorScheme={"messenger"}
+            >
+              新增
+            </Button>
           </div>
         </form>
       </div>
