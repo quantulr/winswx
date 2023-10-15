@@ -1,1 +1,3 @@
-enum Status {}
+enum Status {
+
+}
