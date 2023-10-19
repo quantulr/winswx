@@ -21,6 +21,7 @@ import {
   MdDeleteOutline,
   MdInstallDesktop,
   MdOutlineRefresh,
+  MdOutlineRestartAlt,
 } from "react-icons/md";
 import { VscDebugStart } from "react-icons/vsc";
 import { HiOutlineStop } from "react-icons/hi";
@@ -133,6 +134,20 @@ const Services = () => {
                         }}
                       >
                         停止
+                      </Button>
+                    )}
+                    {service.status == "Active (running)" && (
+                      <Button
+                        className={styles.operationButton}
+                        size={"xs"}
+                        leftIcon={<MdOutlineRestartAlt />}
+                        onClick={() => {
+                          winswCommand("restart", service.path).then(() => {
+                            void mutate();
+                          });
+                        }}
+                      >
+                        重启
                       </Button>
                     )}
                     {service.status != "NonExistent" && (
