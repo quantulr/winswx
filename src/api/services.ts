@@ -156,10 +156,24 @@ export const useServiceDetail = (serviceId?: string) => {
     return parser.parse(xmlContent).service;
   };
   const { data, error, isLoading } = useSWR<ServiceDetail>(serviceId, fetcher);
-  console.log(data);
   return {
     service: data,
     isError: error,
     isLoading,
   };
+};
+
+export const updateService = (service: ServiceDetail) => {
+  const servicePath = `services/${service.id}/${service.id}.xml`;
+  const isExists = exists(servicePath, { dir: BaseDirectory.AppData });
+  if (!isExists) {
+    throw new Error("服务不存在");
+  }
+  const xmlBuilder = new XMLBuilder({
+    format: true,
+  });
+  const xmlStr = xmlBuilder.build({
+    service,
+  });
+  return writeTextFile(servicePath, xmlStr, { dir: BaseDirectory.AppData });
 };

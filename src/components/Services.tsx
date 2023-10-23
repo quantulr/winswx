@@ -1,6 +1,10 @@
 import {
   Badge,
   Button,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Table,
   TableContainer,
   Tbody,
@@ -11,7 +15,6 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import {
-  installService,
   removeService,
   useServicesList,
   winswCommand,
@@ -25,9 +28,9 @@ import {
 } from "react-icons/md";
 import { VscDebugStart } from "react-icons/vsc";
 import { HiOutlineStop } from "react-icons/hi";
-import styles from "./Services.module.scss";
 import { useNavigate } from "react-router-dom";
 import { LuFileEdit } from "react-icons/lu";
+import { HiChevronDown } from "react-icons/hi2";
 
 const Services = () => {
   const navigate = useNavigate();
@@ -76,127 +79,113 @@ const Services = () => {
                   </Badge>
                 </Td>
                 <Td>
-                  <div className={styles.operationButtons}>
-                    {service.status === "NonExistent" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        colorScheme={"whatsapp"}
-                        leftIcon={<MdInstallDesktop />}
-                        onClick={() => {
-                          installService(service.path).then(() => {
-                            void mutate();
-                          });
-                        }}
-                      >
-                        安装
-                      </Button>
-                    )}
-                    {service.status === "Inactive (stopped)" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        colorScheme={"facebook"}
-                        leftIcon={<MdDeleteOutline />}
-                        onClick={() => {
-                          winswCommand("uninstall", service.path).then(() => {
-                            void mutate();
-                          });
-                        }}
-                      >
-                        卸载
-                      </Button>
-                    )}
-                    {service.status === "Inactive (stopped)" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        colorScheme={"green"}
-                        leftIcon={<VscDebugStart />}
-                        onClick={() => {
-                          winswCommand("start", service.path).then(() => {
-                            mutate();
-                          });
-                        }}
-                      >
-                        启动
-                      </Button>
-                    )}
-                    {service.status === "Active (running)" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        leftIcon={<HiOutlineStop />}
-                        onClick={() => {
-                          winswCommand("stop", service.path).then(() => {
-                            void mutate();
-                          });
-                        }}
-                      >
-                        停止
-                      </Button>
-                    )}
-                    {service.status == "Active (running)" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        leftIcon={<MdOutlineRestartAlt />}
-                        onClick={() => {
-                          winswCommand("restart", service.path).then(() => {
-                            void mutate();
-                          });
-                        }}
-                      >
-                        重启
-                      </Button>
-                    )}
-                    {service.status != "NonExistent" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        leftIcon={<MdOutlineRefresh />}
-                        onClick={() => {
-                          winswCommand("refresh", service.path).then(() => {
-                            void mutate();
-                          });
-                        }}
-                      >
-                        刷新
-                      </Button>
-                    )}
-
-                    <Button
-                      className={styles.operationButton}
+                  <Menu>
+                    <MenuButton
                       size={"xs"}
-                      colorScheme={"orange"}
-                      leftIcon={<LuFileEdit />}
-                      onClick={() => {
-                        navigate(`/edit/${service.id}`);
-                      }}
+                      as={Button}
+                      rightIcon={<HiChevronDown />}
                     >
-                      修改
-                    </Button>
-
-                    {service.status === "NonExistent" && (
-                      <Button
-                        className={styles.operationButton}
-                        size={"xs"}
-                        colorScheme={"red"}
-                        leftIcon={<MdDeleteOutline />}
-                        onClick={() => {
-                          removeService(service.id).then(() => {
-                            toast({
-                              title: `服务已删除`,
-                              status: "success",
+                      操作
+                    </MenuButton>
+                    <MenuList>
+                      {service.status === "NonExistent" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("install", service.path).then(() => {
+                              void mutate();
                             });
-                            void mutate();
-                          });
+                          }}
+                          icon={<MdInstallDesktop />}
+                        >
+                          安装
+                        </MenuItem>
+                      )}
+                      {service.status === "Inactive (stopped)" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("uninstall", service.path).then(() => {
+                              void mutate();
+                            });
+                          }}
+                          icon={<MdDeleteOutline />}
+                        >
+                          卸载
+                        </MenuItem>
+                      )}
+                      {service.status === "Inactive (stopped)" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("start", service.path).then(() => {
+                              void mutate();
+                            });
+                          }}
+                          icon={<VscDebugStart />}
+                        >
+                          启动
+                        </MenuItem>
+                      )}
+                      {service.status === "Active (running)" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("stop", service.path).then(() => {
+                              void mutate();
+                            });
+                          }}
+                          icon={<HiOutlineStop />}
+                        >
+                          停止
+                        </MenuItem>
+                      )}
+                      {service.status == "Active (running)" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("restart", service.path).then(() => {
+                              void mutate();
+                            });
+                          }}
+                          icon={<MdOutlineRestartAlt />}
+                        >
+                          重启
+                        </MenuItem>
+                      )}
+                      {service.status != "NonExistent" && (
+                        <MenuItem
+                          onClick={() => {
+                            winswCommand("refresh", service.path).then(() => {
+                              void mutate();
+                            });
+                          }}
+                          icon={<MdOutlineRefresh />}
+                        >
+                          刷新
+                        </MenuItem>
+                      )}
+                      <MenuItem
+                        onClick={() => {
+                          navigate(`/edit/${service.id}`);
                         }}
+                        icon={<LuFileEdit />}
                       >
-                        删除
-                      </Button>
-                    )}
-                  </div>
+                        修改
+                      </MenuItem>
+                      {service.status === "NonExistent" && (
+                        <MenuItem
+                          onClick={() => {
+                            removeService(service.id).then(() => {
+                              toast({
+                                title: `服务已删除`,
+                                status: "success",
+                              });
+                              void mutate();
+                            });
+                          }}
+                          icon={<MdDeleteOutline />}
+                        >
+                          删除
+                        </MenuItem>
+                      )}
+                    </MenuList>
+                  </Menu>
                 </Td>
               </Tr>
             ))}

@@ -18,6 +18,7 @@ import { CgSelectR } from "react-icons/cg";
 import { dialog } from "@tauri-apps/api";
 import {
   ServiceDetail,
+  updateService,
   useServiceDetail,
   writeService,
 } from "../api/services.ts";
@@ -58,15 +59,37 @@ const CreateService = () => {
         `${values.id}.xml`,
       );
       const service = omitBy(values, (value) => isNil(value) || value === "");
-      writeService(service as unknown as ServiceDetail, servicePath).then(
-        () => {
-          toast({
-            title: "新增服务成功",
-            status: "success",
+      if (serviceId) {
+        updateService(service as unknown as ServiceDetail)
+          .then(() => {
+            toast({
+              status: "success",
+              title: "更新服务成功",
+            });
+            navigate("/");
+          })
+          .catch(() => {
+            toast({
+              status: "error",
+              title: "更新服务失败",
+            });
           });
-          navigate("/");
-        },
-      );
+      } else {
+        writeService(service as unknown as ServiceDetail, servicePath)
+          .then(() => {
+            toast({
+              title: "新增服务成功",
+              status: "success",
+            });
+            navigate("/");
+          })
+          .catch(() => {
+            toast({
+              status: "error",
+              title: "新增服务失败",
+            });
+          });
+      }
     },
   });
   return (
@@ -85,6 +108,7 @@ const CreateService = () => {
           <FormControl isInvalid={!!formik.errors.id && formik.touched.id}>
             <FormLabel>服务ID</FormLabel>
             <Input
+              disabled={!!serviceId}
               id={"id"}
               onChange={formik.handleChange}
               value={formik.values.id}
@@ -158,7 +182,7 @@ const CreateService = () => {
               type={"submit"}
               colorScheme={"messenger"}
             >
-              新增
+              {serviceId ? "更新" : "新增"}
             </Button>
           </div>
         </form>
