@@ -40,8 +40,8 @@ const Services = () => {
     return <div>error</div>;
   }
   return (
-    <div>
-      <div className={"p-2"}>
+    <div className={"p-6"}>
+      <div>
         <Button
           size={"sm"}
           leftIcon={<MdAddCircleOutline />}
@@ -52,7 +52,7 @@ const Services = () => {
           新增服务
         </Button>
       </div>
-      <TableContainer>
+      <TableContainer className={"mt-2"}>
         <Table>
           <Thead>
             <Tr>
@@ -71,8 +71,8 @@ const Services = () => {
                       service.status === "Active (running)"
                         ? "green"
                         : service.status === "Inactive (stopped)"
-                        ? "red"
-                        : undefined
+                          ? "red"
+                          : undefined
                     }
                   >
                     {service.status}

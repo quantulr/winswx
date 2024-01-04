@@ -94,7 +94,7 @@ const CreateService = () => {
   });
   return (
     <>
-      <div className={"p-2"}>
+      <div className={"p-6"}>
         <Button
           size={"sm"}
           leftIcon={<MdArrowBack />}
