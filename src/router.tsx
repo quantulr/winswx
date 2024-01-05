@@ -1,12 +1,31 @@
-import { createBrowserRouter } from "react-router-dom";
-import Services from "./components/Services.tsx";
+import { createBrowserRouter /*useLocation*/ } from "react-router-dom";
+
 import CreateService from "./components/CreateService.tsx";
-// import ServicesGrid from "./components/ServicesGrid.tsx";
+
+// import {ReactNode, useMemo} from "react";
+// import {ScaleFade} from "@chakra-ui/react";
+import ServicesGrid from "./components/ServicesGrid.tsx";
+
+// const TransitionRoute = ({
+//                              path,
+//                              children,
+//                          }: {
+//     path: string;
+//     children: ReactNode;
+// }) => {
+//     const {pathname} = useLocation();
+//     const isActive = useMemo(() => path === pathname, [path, pathname]);
+//     return (
+//         <ScaleFade initialScale={0.8} in={isActive}>
+//             {children}
+//         </ScaleFade>
+//     );
+// };
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Services />,
+    element: <ServicesGrid />,
   },
   {
     path: "/new",

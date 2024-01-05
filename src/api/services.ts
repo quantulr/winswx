@@ -1,5 +1,6 @@
 import {
   BaseDirectory,
+  copyFile,
   createDir,
   exists,
   readDir,
@@ -8,7 +9,7 @@ import {
   writeTextFile,
 } from "@tauri-apps/api/fs";
 import useSWR from "swr";
-import { dirname, join } from "@tauri-apps/api/path";
+import { dirname, join, resolveResource } from "@tauri-apps/api/path";
 import { Command } from "@tauri-apps/api/shell";
 import { XMLBuilder, XMLParser } from "fast-xml-parser";
 
@@ -25,6 +26,19 @@ const checkServicesDirExist = async () => {
   }
 };
 
+/**
+ *
+ */
+export const copyBinary = async () => {
+  const binName = "winsw-x86_64-pc-windows-msvc.exe";
+  const resource = await resolveResource(`bin/${binName}`);
+  const exist = await exists("winsw.exe", { dir: BaseDirectory.AppData });
+  console.log(exist);
+  if (!exist) {
+    await copyFile(resource, "winsw.exe", { dir: BaseDirectory.AppData });
+  }
+};
+
 interface Service {
   id: string;
   path: string;
@@ -36,7 +50,7 @@ interface Service {
  * @param path
  */
 const serviceStatus = async (path: string) => {
-  const command = Command.sidecar("bin/winsw", ["status", path]);
+  const command = new Command("winsw", ["status", path]);
   const child = await command.execute();
 
   if (child.code === -1) {
@@ -90,7 +104,7 @@ export const useServicesList = () => {
  * @param path
  */
 export const installService = async (path: string) => {
-  const command = Command.sidecar("bin/winsw", ["install", path]);
+  const command = new Command("winsw", ["install", path]);
   const child = await command.execute();
   return child.stdout;
 };
@@ -101,7 +115,7 @@ export const installService = async (path: string) => {
  * @param path
  */
 export const winswCommand = async (command: string, path: string) => {
-  const cmd = Command.sidecar("bin/winsw", [command, path]);
+  const cmd = new Command("winsw", [command, path]);
   const child = await cmd.execute();
   return child.stdout;
 };
@@ -146,6 +160,10 @@ export const removeService = async (serviceId: string) => {
   });
 };
 
+/**
+ * 获取服务详情
+ * @param serviceId 服务id
+ */
 export const useServiceDetail = (serviceId?: string) => {
   const fetcher = async (serviceId: string) => {
     const xmlContent = await readTextFile(
@@ -163,6 +181,10 @@ export const useServiceDetail = (serviceId?: string) => {
   };
 };
 
+/**
+ * 更新服务
+ * @param service
+ */
 export const updateService = (service: ServiceDetail) => {
   const servicePath = `services/${service.id}/${service.id}.xml`;
   const isExists = exists(servicePath, { dir: BaseDirectory.AppData });

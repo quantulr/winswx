@@ -16,11 +16,11 @@
       "shell": {
         "all": false,
         "open": true,
-        "sidecar": true,
+        "execute": true,
         "scope": [
           {
-            "name": "bin/winsw",
-            "sidecar": true,
+            "name": "winsw",
+            "cmd": "$APPDATA\\winsw.exe",
             "args": true
           }
         ]
@@ -30,7 +30,9 @@
       },
       "fs": {
         "all": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       },
       "dialog": {
         "open": true
@@ -47,7 +49,12 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "externalBin": ["bin/winsw"]
+      "externalBin": [
+        "bin/winsw"
+      ],
+      "resources": [
+        "bin/winsw-x86_64-pc-windows-msvc.exe"
+      ]
     },
     "security": {
       "csp": null
@@ -58,7 +65,9 @@
         "resizable": true,
         "title": "winswx",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "minWidth": 400,
+        "minHeight": 300
       }
     ]
   }
