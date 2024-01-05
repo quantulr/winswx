@@ -71,7 +71,6 @@ const ServicesGrid = () => {
               <Button
                 isDisabled={srv.status !== "Inactive (stopped)"}
                 size={"xs"}
-                colorScheme={"green"}
                 onClick={() => {
                   winswCommand("start", srv.path).then(() => {
                     void mutate();
@@ -83,7 +82,6 @@ const ServicesGrid = () => {
               <Button
                 isDisabled={srv.status !== "Active (running)"}
                 size={"xs"}
-                colorScheme={"red"}
                 onClick={() => {
                   winswCommand("stop", srv.path).then(() => {
                     void mutate();
