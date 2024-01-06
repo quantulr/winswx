@@ -5,6 +5,8 @@ import router from "./router.tsx";
 import { useEffect, useState } from "react";
 import { copyBinary } from "./api/services.ts";
 
+import "overlayscrollbars/overlayscrollbars.css";
+
 function App() {
   const [loading, setLoading] = useState(true);
   // useEffect(() => {
@@ -16,11 +18,13 @@ function App() {
   //         window.removeEventListener("contextmenu", handleRightClick);
   //     };
   // }, []);
+
   useEffect(() => {
     copyBinary().then(() => {
       setLoading(false);
     });
   }, []);
+
   if (loading)
     return (
       <div className={"w-screen h-screen flex justify-center items-center"}>

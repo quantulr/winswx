@@ -29,16 +29,20 @@ const ServicesGrid = () => {
   const { services, isLoading, isError, mutate } = useServicesList();
   const toast = useToast();
   if (isError) {
-    return <div className={"gradient h-screen"}>error</div>;
+    return (
+      <div className={"gradient h-screen flex justify-center items-center"}>
+        error
+      </div>
+    );
   }
   if (isLoading)
     return (
-      <div className={"gradient h-screen flex justify-center items-center"}>
+      <div className={"gradient min-h-screen flex justify-center items-center"}>
         <Spinner />
       </div>
     );
   return (
-    <div className={`gradient p-6 h-screen`}>
+    <div className={`gradient p-6 min-h-screen`}>
       <div
         className={
           "services-grid grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3"
