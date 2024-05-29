@@ -1,6 +1,6 @@
 [package]
 name = "winswx"
-version = "0.0.0"
+version = "0.0.1"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -16,7 +16,7 @@ tauri-build = { version = "1.5", features = [] }
 tauri = { version = "1.5", features = [ "shell-execute", "dialog-open", "fs-all", "path-all", "shell-open"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-quick-xml = "0.30.0"
+quick-xml = "0.31.0"
 serde-xml-rs = "0.6.0"
 
 [features]
