@@ -39,7 +39,7 @@ export const copyBinary = async () => {
   }
 };
 
-interface Service {
+export interface Service {
   id: string;
   path: string;
   status: string;
@@ -117,7 +117,8 @@ export const installService = async (path: string) => {
 export const winswCommand = async (command: string, path: string) => {
   const cmd = new Command("winsw", [command, path]);
   const child = await cmd.execute();
-  return child.stdout;
+
+  return { stdout: child.stdout, code: child.code };
 };
 
 export interface ServiceDetail {
