@@ -31,9 +31,10 @@ const checkServicesDirExist = async () => {
  */
 export const copyBinary = async () => {
   const binName = "winsw-x86_64-pc-windows-msvc.exe";
+  // const isAppDataDirExist = await exists()
+  await checkServicesDirExist();
   const resource = await resolveResource(`bin/${binName}`);
   const exist = await exists("winsw.exe", { dir: BaseDirectory.AppData });
-  console.log(exist);
   if (!exist) {
     await copyFile(resource, "winsw.exe", { dir: BaseDirectory.AppData });
   }
@@ -51,8 +52,16 @@ export interface Service {
  */
 const serviceStatus = async (path: string) => {
   const command = new Command("winsw", ["status", path]);
+  command
+    .execute()
+    .then((re) => {
+      console.log(re);
+    })
+    .catch((e) => {
+      console.log(e);
+    });
   const child = await command.execute();
-
+  console.log(233);
   if (child.code === -1) {
     throw new Error(child.stdout);
   }
@@ -75,6 +84,7 @@ const fetcher = async (): Promise<Service[]> => {
       throw new Error("error");
     }
     const path = await join(fileEntry.path, `${id}.xml`);
+    console.log(path);
     const status = await serviceStatus(path);
     services.push({
       id,
@@ -82,6 +92,7 @@ const fetcher = async (): Promise<Service[]> => {
       status,
     });
   }
+
   return services;
 };
 
