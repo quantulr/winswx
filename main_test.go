@@ -3,7 +3,9 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -193,5 +195,125 @@ func TestButtonsUsePointerCursor(t *testing.T) {
 		if got := tt.Cursor(); got != ui.CursorPointer {
 			t.Errorf("cursor over %s = %v, want pointer", label, got)
 		}
+	}
+}
+
+// TestAddService creates the directory and WinSW configuration of a new
+// service.
+func TestAddService(t *testing.T) {
+	userData := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, userData)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	a := &app{}
+	a.load()
+	a.newName = "demo"
+	a.newExe = `C:\Tools\demo.exe`
+	a.newArgs = "-port 8080"
+	if !a.addService() {
+		t.Fatalf("addService: %s", a.addErr)
+	}
+	data, err := os.ReadFile(filepath.Join(userData, "services", "demo", "demo.xml"))
+	if err != nil {
+		t.Fatalf("reading the configuration: %v", err)
+	}
+	for _, want := range []string{
+		"<id>demo</id>",
+		`<executable>C:\Tools\demo.exe</executable>`,
+		"<arguments>-port 8080</arguments>",
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("configuration %q does not contain %q", data, want)
+		}
+	}
+	found := false
+	for _, s := range a.services {
+		if s.name == "demo" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("services %v do not include demo", a.services)
+	}
+
+	// The same name twice is refused.
+	a.newName = "demo"
+	a.newExe = `C:\Tools\demo.exe`
+	if a.addService() {
+		t.Error("adding the same service twice was accepted")
+	}
+}
+
+func TestAddServiceValidation(t *testing.T) {
+	userData := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, userData)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	a := &app{}
+	a.load()
+	for _, c := range []struct{ name, exe string }{
+		{"", `C:\x.exe`},
+		{"..", `C:\x.exe`},
+		{`a/b`, `C:\x.exe`},
+		{"CON", `C:\x.exe`},
+		{" name", `C:\x.exe`},
+		{"ok", ""},
+	} {
+		a.newName, a.newExe, a.newArgs, a.addErr = c.name, c.exe, "", ""
+		a.addService()
+		if a.addErr == "" {
+			t.Errorf("addService(name %q, exe %q) was accepted", c.name, c.exe)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(userData, "services"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("rejected services created %v", entries)
+	}
+}
+
+func TestServiceXML(t *testing.T) {
+	data, err := serviceXML("demo", `C:\a&b.exe`, `-x "a & b" <c>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{"<id>demo</id>", `C:\a&amp;b.exe`, "&lt;c&gt;"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("configuration %q does not contain %q", text, want)
+		}
+	}
+}
+
+func TestAddDialogOpens(t *testing.T) {
+	a := &app{}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click("Add Service"); err != nil {
+		t.Fatalf("clicking Add Service: %v", err)
+	}
+	for _, want := range []string{"Browse…", "Cancel", "Add"} {
+		if !tt.HasText(want) {
+			t.Errorf("texts %q do not show %q", tt.Texts(), want)
+		}
+	}
+}
+
+func TestCloseDialogAnimates(t *testing.T) {
+	a := &app{dir: t.TempDir(), winsw: "winsw.exe"}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click("Add Service"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(400 * time.Millisecond)
+	tt.Key(0, ui.KeyEscape)
+	tt.Advance(40 * time.Millisecond)
+	if !a.adding {
+		t.Fatal("the dialog was removed before its closing animation")
+	}
+	tt.Advance(400 * time.Millisecond)
+	if a.adding {
+		t.Fatal("the dialog stayed after its closing animation")
 	}
 }

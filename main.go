@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/xml"
 	"log"
 	"os"
 	"os/exec"
@@ -33,6 +34,9 @@ const (
 // the button that shows it.
 var refreshIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`))
 
+// plusIcon is a plus, drawn in the text color of the button that shows it.
+var plusIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`))
+
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
 type service struct {
@@ -59,6 +63,15 @@ type app struct {
 	err      error           // why the services could not be read, if they could not
 	win      *mygo.Window    // the window, nil before it is made
 	queryGen int             // counts status queries, so a stale one is ignored
+
+	adding    bool    // the Add Service dialog is built
+	addOpen   bool    // DialogBase's open flag
+	addTarget float32 // 1 shown, 0 closing
+	addFresh  bool    // seed the opening animation
+	newName   string  // the name in the dialog
+	newExe    string  // the executable in the dialog
+	newArgs   string  // the arguments in the dialog
+	addErr    string  // why the service could not be added
 }
 
 // winswExe returns the path of the WinSW executable that ships with the
@@ -136,6 +149,96 @@ func serviceConfig(dir, name string) string {
 		found = filepath.Join(serviceDir, entry.Name())
 	}
 	return found
+}
+
+// serviceXML returns the WinSW configuration of a service.
+func serviceXML(name, executable, arguments string) ([]byte, error) {
+	cfg := struct {
+		XMLName    xml.Name `xml:"service"`
+		ID         string   `xml:"id"`
+		Executable string   `xml:"executable"`
+		Arguments  string   `xml:"arguments,omitempty"`
+	}{ID: name, Executable: executable, Arguments: arguments}
+	body, err := xml.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	out := append([]byte(xml.Header), body...)
+	return append(out, '\n'), nil
+}
+
+// validateServiceName reports why name cannot be the name of a service
+// directory, or "" when it can.
+func validateServiceName(name string) string {
+	switch {
+	case name == "":
+		return "The service needs a name."
+	case name == "." || name == "..":
+		return "The service needs a name other than . or .."
+	case strings.TrimSpace(name) != name:
+		return "The service name cannot start or end with a space."
+	case strings.ContainsAny(name, `\/:*?"<>|`):
+		return `The service name cannot contain \ / : * ? " < > |`
+	}
+	for _, r := range name {
+		if r < 32 {
+			return "The service name cannot contain control characters."
+		}
+	}
+	base := name
+	if i := strings.IndexByte(base, '.'); i >= 0 {
+		base = base[:i]
+	}
+	switch strings.ToUpper(base) {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return "The service name is reserved on Windows."
+	}
+	return ""
+}
+
+// addService creates a service directory and its WinSW configuration from
+// the fields of the Add Service dialog.
+func (a *app) addService() bool {
+	name := a.newName // not trimmed: a name with spaces at its ends is refused
+	exe := strings.TrimSpace(a.newExe)
+	args := strings.TrimSpace(a.newArgs)
+	if msg := validateServiceName(name); msg != "" {
+		a.addErr = msg
+		return false
+	}
+	if exe == "" {
+		a.addErr = "The executable is required."
+		return false
+	}
+	if a.dir == "" {
+		a.addErr = "The services directory is not available."
+		return false
+	}
+	dir := filepath.Join(a.dir, name)
+	if _, err := os.Stat(dir); err == nil {
+		a.addErr = "A service named " + name + " already exists."
+		return false
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		a.addErr = err.Error()
+		return false
+	}
+	config := filepath.Join(dir, name+".xml")
+	body, err := serviceXML(name, exe, args)
+	if err == nil {
+		err = os.WriteFile(config, body, 0o644)
+	}
+	if err != nil {
+		_ = os.RemoveAll(dir) // do not leave half a service behind
+		a.addErr = err.Error()
+		return false
+	}
+	a.addErr = ""
+	a.newName, a.newExe, a.newArgs = "", "", ""
+	a.load()
+	return true
 }
 
 // statusColor is the color that shows status: green running, grey
@@ -339,6 +442,19 @@ func (a *app) view(c *ui.Context) {
 					ui.Text(c, "Services").FontSize(20).Bold()
 					ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
 					ui.Spacer(c).Grow(1)
+					add := ui.Button(c, "").Label("Add Service").Tooltip("Add Service").
+						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
+						Material(glass.Glass{Interactive: true}).Children(func() {
+						ui.Icon(c, plusIcon).FontSize(16)
+					})
+					if add.Clicked() {
+						a.adding = true
+						a.addOpen = true
+						a.addTarget = 0
+						a.addFresh = true
+						a.addErr = ""
+						a.newName, a.newExe, a.newArgs = "", "", ""
+					}
 					refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
 						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
 						Material(glass.Glass{Interactive: true}).Children(func() {
@@ -385,6 +501,110 @@ func (a *app) view(c *ui.Context) {
 			})
 		})
 	})
+	a.addDialog(c)
+}
+
+// addDialog asks for the name, executable and arguments of a new service.
+func (a *app) addDialog(c *ui.Context) {
+	if !a.adding {
+		return
+	}
+	a.addOpen = true
+	t := c.Theme()
+	winW, winH := c.Size()
+	w := min(360, max(160, winW-80)) // the panel keeps 20 DIP of padding aside
+	ui.DialogBase(c, &a.addOpen, func(backdrop, panel ui.Element) {
+		anim := ui.Animation{Duration: 160 * time.Millisecond, Ease: ui.EaseOut}
+		target := a.addTarget
+		p := panel.AnimateTo("in", target, anim)
+		dim := backdrop.AnimateTo("dim", target, anim)
+		if a.addFresh {
+			// An animated value starts at its first target: show the
+			// dialog at zero for a frame, then ease it in on the next.
+			a.addFresh = false
+			a.addTarget = 1
+			c.Invalidate()
+		}
+		p = min(1, max(0, p))
+		backdrop.Background(ui.RGBA(0, 0, 0, 0.4*dim))
+		panel.Padding(t.Space(5)).Gap(t.Space(3)).Radius(t.Space(2.5)).
+			Background(t.Background).
+			MaxWidth(winW-t.Space(10)).MaxHeight(winH-t.Space(10)).
+			Shadow(0, 10*p, 30*p, 0, ui.RGBA(0, 0, 0, 0.3*p)).
+			Scale(0.96+0.04*p, 0.96+0.04*p).Opacity(p)
+		ui.Text(c, "Add Service").FontSize(18).Bold()
+		name := ui.TextInput(c, &a.newName).Placeholder("Service name").
+			Label("Name").AutoFocus().Width(w)
+		var exe ui.Element
+		ui.Row(c).Gap(8).Width(w).Children(func() {
+			exe = ui.TextInput(c, &a.newExe).Placeholder(`C:\path\to\service.exe`).
+				Label("Executable").Grow(1)
+			if ui.Button(c, "Browse…").Cursor(ui.CursorPointer).Clicked() {
+				a.pickExecutable()
+			}
+		})
+		args := ui.TextInput(c, &a.newArgs).Placeholder("Arguments (optional)").
+			Label("Arguments").Width(w)
+		if a.addErr != "" {
+			ui.Text(c, a.addErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
+		}
+		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
+			if ui.Button(c, "Cancel").Clicked() {
+				a.closeAddDialog(c)
+			}
+			if ui.PrimaryButton(c, "Add").Clicked() ||
+				name.Submitted() || exe.Submitted() || args.Submitted() {
+				if a.addService() {
+					a.closeAddDialog(c)
+				}
+			}
+		})
+		// Faded away: take the dialog out of the tree.
+		if a.addTarget == 0 && p < 0.01 {
+			a.adding = false
+			a.addOpen = false
+		}
+	})
+	if !a.addOpen {
+		// A click outside or Escape closed it: ease it out.
+		a.closeAddDialog(c)
+	}
+}
+
+// closeAddDialog keeps the dialog built while it eases out.
+func (a *app) closeAddDialog(c *ui.Context) {
+	if a.addTarget == 0 {
+		return
+	}
+	a.addOpen = true
+	a.addTarget = 0
+	c.Invalidate()
+}
+
+// pickExecutable asks for the executable of the service with the system's
+// file dialog.
+func (a *app) pickExecutable() {
+	if a.win == nil {
+		return
+	}
+	win := a.win
+	go func() {
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+			Parent:      win,
+			Title:       "Choose an executable",
+			ButtonLabel: "Choose",
+			Filters:     []mygo.FileFilter{{Name: "Programs", Extensions: []string{"exe"}}},
+		})
+		win.Update(func() {
+			switch {
+			case err != nil:
+				a.addErr = err.Error()
+			case len(paths) > 0:
+				a.newExe = paths[0]
+				a.addErr = ""
+			}
+		})
+	}()
 }
 
 // serviceCard draws a service as a card in the grid, with its first
