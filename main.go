@@ -1,3 +1,5 @@
+//go:generate go run ./scripts/fetch-winsw
+
 package main
 
 import (

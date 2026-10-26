@@ -52,7 +52,7 @@ func TestLoadServices(t *testing.T) {
 		}
 	}
 	if a.winsw == "" {
-		t.Error("the bundled winsw.exe was not found")
+		t.Error("the bundled winsw.exe was not found; run `go run ./scripts/fetch-winsw` first")
 	}
 }
 
@@ -63,7 +63,7 @@ func TestWinswBundled(t *testing.T) {
 	}
 	info, err := os.Stat(exe)
 	if err != nil {
-		t.Fatalf("bundled winsw at %s: %v", exe, err)
+		t.Fatalf("bundled winsw at %s: %v (run `go run ./scripts/fetch-winsw` first)", exe, err)
 	}
 	if info.Size() == 0 {
 		t.Fatalf("bundled winsw at %s is empty", exe)
