@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/glass"
@@ -330,7 +331,7 @@ func (a *app) view(c *ui.Context) {
 				ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
 				ui.Spacer(c).Grow(1)
 				refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
-					Padding(6, 8).BorderWidth(0).Radius(10).
+					Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
 					Material(glass.Glass{Interactive: true}).Children(func() {
 					ui.Icon(c, refreshIcon).FontSize(16)
 				})
@@ -388,11 +389,24 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 		status, color = "Working…", t.Accent
 	}
 	card := ui.Column(c).Width(cardWidth).Height(cardHeight).Label(s.name).
-		Gap(10).Padding(14).Radius(10).
-		Background(t.Surface).Border(1, t.Border)
+		Gap(10).Padding(14).Radius(12)
+	// The shadow deepens and a faint tint fades in as the pointer comes
+	// over the card, and both ease back as it leaves.
+	lift := float32(0)
+	tint := ui.Transparent
 	if card.Hovered() {
-		card.Background(t.SurfaceHover)
+		lift, tint = 1, t.Text.Alpha(0.06)
 	}
+	anim := ui.Animation{Duration: 160 * time.Millisecond, Ease: ui.EaseOut}
+	lift = card.AnimateTo("lift", lift, anim)
+	tint = card.AnimateColor("tint", tint, anim)
+	base, hovered := float32(0.07), float32(0.16)
+	if t.Dark {
+		base, hovered = 0.28, 0.48
+	}
+	card.Material(glass.Glass{Tint: tint})
+	card.Shadow(0, 2+6*lift, 8+16*lift, 0,
+		ui.RGBA(0, 0, 0, base+(hovered-base)*lift))
 	card.Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Gap(10).Children(func() {
 			initial := strings.ToUpper(string([]rune(s.name)[0]))
@@ -433,12 +447,13 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 			} else {
 				b = ui.PrimaryButton(c, label)
 			}
-			if b.Padding(3, 7).Disabled(busy).Clicked() {
+			if b.Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy).Clicked() {
 				a.run(s.name, command)
 			}
 		}
 		if installed {
-			ui.Button(c, "More").Padding(3, 7).Disabled(busy).Menu(func(m *ui.Menu) {
+			ui.Button(c, "More").Padding(3, 7).Cursor(ui.CursorPointer).
+				Disabled(busy).Menu(func(m *ui.Menu) {
 				if m.Item("Restart").Disabled(busy).Chosen() {
 					a.run(s.name, "restart")
 				}

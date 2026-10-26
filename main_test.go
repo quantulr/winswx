@@ -180,3 +180,18 @@ func TestCardWidthFixed(t *testing.T) {
 		}
 	}
 }
+
+func TestButtonsUsePointerCursor(t *testing.T) {
+	a := &app{services: []service{{name: "caddy", status: statusStopped}}}
+	tt := ui.NewTester(a.view, 480, 360)
+	for _, label := range []string{"Start", "More", "Refresh"} {
+		r, ok := tt.Find(label)
+		if !ok {
+			t.Fatalf("%s not found", label)
+		}
+		tt.Move(r.X+r.W/2, r.Y+r.H/2)
+		if got := tt.Cursor(); got != ui.CursorPointer {
+			t.Errorf("cursor over %s = %v, want pointer", label, got)
+		}
+	}
+}
