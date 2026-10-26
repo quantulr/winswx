@@ -400,3 +400,67 @@ func TestEditService(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteService(t *testing.T) {
+	userData := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, userData)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	a := &app{}
+	a.load()
+	a.newName = "demo"
+	a.newExe = `C:\Tools\demo.exe`
+	if !a.addService() {
+		t.Fatalf("addService: %s", a.dlgErr)
+	}
+	dir := filepath.Join(userData, "services", "demo")
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("the service was not created: %v", err)
+	}
+
+	a.deleting = "demo"
+	a.deleteService()
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("the service directory remains: %v", err)
+	}
+	for _, s := range a.services {
+		if s.name == "demo" {
+			t.Error("the deleted service remains in the list")
+		}
+	}
+}
+
+func TestDeleteServiceFromMenu(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "demo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(dir, "demo", "demo.xml")
+	if err := os.WriteFile(config, []byte("<service><id>demo</id><executable>x.exe</executable></service>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{
+		dir:      dir,
+		winsw:    "winsw.exe",
+		services: []service{{name: "demo", status: statusNotInstalled}},
+	}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click("More"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tt.ChooseMenuItem("Delete…"); err != nil {
+		t.Fatal(err)
+	}
+	if !a.confirmDelete {
+		t.Fatal("the delete alert did not open")
+	}
+	if err := tt.Click("Delete"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "demo")); !os.IsNotExist(err) {
+		t.Errorf("the service directory remains: %v", err)
+	}
+	if a.confirmDelete {
+		t.Error("the delete alert stayed open")
+	}
+}

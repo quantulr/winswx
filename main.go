@@ -66,15 +66,17 @@ type app struct {
 	win      *mygo.Window    // the window, nil before it is made
 	queryGen int             // counts status queries, so a stale one is ignored
 
-	dialog    dialogMode // the dialog that shows, none when closed
-	editDir   string     // the directory of the service being edited
-	dlgOpen   bool       // DialogBase's open flag
-	dlgTarget float32    // 1 shown, 0 closing
-	dlgFresh  bool       // seed the opening animation
-	newName   string     // the name in the dialog
-	newExe    string     // the executable in the dialog
-	newArgs   string     // the arguments in the dialog
-	dlgErr    string     // why the dialog could not be saved
+	dialog        dialogMode // the dialog that shows, none when closed
+	editDir       string     // the directory of the service being edited
+	deleting      string     // the service asked about for deletion
+	confirmDelete bool       // the delete alert shows
+	dlgOpen       bool       // DialogBase's open flag
+	dlgTarget     float32    // 1 shown, 0 closing
+	dlgFresh      bool       // seed the opening animation
+	newName       string     // the name in the dialog
+	newExe        string     // the executable in the dialog
+	newArgs       string     // the arguments in the dialog
+	dlgErr        string     // why the dialog could not be saved
 }
 
 // dialogMode names the form the dialog shows.
@@ -510,6 +512,7 @@ func (a *app) view(c *ui.Context) {
 		})
 	})
 	a.dialogView(c)
+	a.deleteAlert(c)
 }
 
 // dialogView shows the Add or Edit Service form, easing it in and out.
@@ -642,6 +645,32 @@ func (a *app) closeDialog(c *ui.Context) {
 	a.dlgOpen = true
 	a.dlgTarget = 0
 	c.Invalidate()
+}
+
+// deleteAlert asks before removing a service and its files.
+func (a *app) deleteAlert(c *ui.Context) {
+	switch ui.AlertDialog(c, &a.confirmDelete, "Delete “"+a.deleting+"”?",
+		"This removes its configuration and logs from the services folder.",
+		"Cancel", "Delete") {
+	case 1:
+		a.deleteService()
+	}
+}
+
+// deleteService removes the directory of the service being deleted.
+func (a *app) deleteService() {
+	name := a.deleting
+	a.deleting = ""
+	if name == "" || a.dir == "" || name == "." || name == ".." ||
+		strings.ContainsAny(name, `/\`) {
+		return
+	}
+	if err := os.RemoveAll(filepath.Join(a.dir, name)); err != nil {
+		a.opErr = err.Error()
+		return
+	}
+	a.opErr = ""
+	a.load()
 }
 
 // saveService applies the dialog's fields to the service being edited.
@@ -863,6 +892,11 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 			}
 			if m.Item("Uninstall").Disabled(busy || s.status != statusStopped).Chosen() {
 				a.run(s.name, "uninstall")
+			}
+			m.Separator()
+			if m.Item("Delete…").Disabled(busy || installed).Chosen() {
+				a.deleting = s.name
+				a.confirmDelete = true
 			}
 		})
 	})
