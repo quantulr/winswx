@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
+
+	"mygo/locales"
 )
 
 // serviceStatus is how Windows reports the state of a service.
@@ -38,6 +41,10 @@ var refreshIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg
 
 // plusIcon is a plus, drawn in the text color of the button that shows it.
 var plusIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`))
+
+// languageIcon is a globe, drawn in the text color of the button that
+// shows it.
+var languageIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>`))
 
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
@@ -187,17 +194,17 @@ func serviceXML(name, executable, arguments string) ([]byte, error) {
 func validateServiceName(name string) string {
 	switch {
 	case name == "":
-		return "The service needs a name."
+		return locales.ErrNeedsName()
 	case name == "." || name == "..":
-		return "The service needs a name other than . or .."
+		return locales.ErrNameDots()
 	case strings.TrimSpace(name) != name:
-		return "The service name cannot start or end with a space."
+		return locales.ErrNameEndsInSpace()
 	case strings.ContainsAny(name, `\/:*?"<>|`):
-		return `The service name cannot contain \ / : * ? " < > |`
+		return locales.ErrNameChars()
 	}
 	for _, r := range name {
 		if r < 32 {
-			return "The service name cannot contain control characters."
+			return locales.ErrNameControl()
 		}
 	}
 	base := name
@@ -208,7 +215,7 @@ func validateServiceName(name string) string {
 	case "CON", "PRN", "AUX", "NUL",
 		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
 		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
-		return "The service name is reserved on Windows."
+		return locales.ErrNameReserved()
 	}
 	return ""
 }
@@ -224,16 +231,16 @@ func (a *app) addService() bool {
 		return false
 	}
 	if exe == "" {
-		a.dlgErr = "The executable is required."
+		a.dlgErr = locales.ErrExecutable()
 		return false
 	}
 	if a.dir == "" {
-		a.dlgErr = "The services directory is not available."
+		a.dlgErr = locales.ErrServicesDir()
 		return false
 	}
 	dir := filepath.Join(a.dir, name)
 	if _, err := os.Stat(dir); err == nil {
-		a.dlgErr = "A service named " + name + " already exists."
+		a.dlgErr = locales.ServiceExists(name)
 		return false
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -254,6 +261,27 @@ func (a *app) addService() bool {
 	a.newName, a.newExe, a.newArgs = "", "", ""
 	a.load()
 	return true
+}
+
+// statusLabel says a service's status in the app's language.
+func statusLabel(s serviceStatus) string {
+	switch s {
+	case statusChecking:
+		return locales.StatusChecking()
+	case statusRunning:
+		return locales.StatusRunning()
+	case statusStopped:
+		return locales.StatusStopped()
+	case statusStarting:
+		return locales.StatusStarting()
+	case statusStopping:
+		return locales.StatusStopping()
+	case statusPaused:
+		return locales.StatusPaused()
+	case statusNotInstalled:
+		return locales.StatusNotInstalled()
+	}
+	return locales.StatusUnknown()
 }
 
 // statusColor is the color that shows status: green running, grey
@@ -373,7 +401,7 @@ func (a *app) run(name, command string) {
 	}
 	config := serviceConfig(a.dir, name)
 	if config == "" {
-		a.opErr = name + ": no WinSW configuration file"
+		a.opErr = name + ": " + locales.ErrNoConfig()
 		return
 	}
 	if a.busy == nil {
@@ -454,10 +482,10 @@ func (a *app) view(c *ui.Context) {
 			})
 			ui.Column(c).Grow(1).Gap(12).Padding(16, 20).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-					ui.Text(c, "Services").FontSize(20).Bold()
+					ui.Text(c, locales.Services()).FontSize(20).Bold()
 					ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
 					ui.Spacer(c).Grow(1)
-					add := ui.Button(c, "").Label("Add Service").Tooltip("Add Service").
+					add := ui.Button(c, "").Label(locales.AddService()).Tooltip(locales.AddService()).
 						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
 						Material(glass.Glass{Interactive: true}).Children(func() {
 						ui.Icon(c, plusIcon).FontSize(16)
@@ -465,7 +493,7 @@ func (a *app) view(c *ui.Context) {
 					if add.Clicked() {
 						a.openAddDialog()
 					}
-					refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
+					refresh := ui.Button(c, "").Label(locales.Refresh()).Tooltip(locales.Refresh()).
 						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
 						Material(glass.Glass{Interactive: true}).Children(func() {
 						ui.Icon(c, refreshIcon).FontSize(16)
@@ -473,6 +501,18 @@ func (a *app) view(c *ui.Context) {
 					if refresh.Clicked() {
 						a.load()
 					}
+					language := ui.Button(c, "").Label(locales.Language()).Tooltip(locales.Language()).
+						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
+						Material(glass.Glass{Interactive: true}).Children(func() {
+						ui.Icon(c, languageIcon).FontSize(16)
+					})
+					language.Menu(func(m *ui.Menu) {
+						for _, tag := range mygo.App.Languages() {
+							if m.Item(i18n.Autonym(tag)).Checked(tag == mygo.App.Locale()).Chosen() {
+								mygo.App.SetLocale(tag)
+							}
+						}
+					})
 				})
 				if a.opErr != "" {
 					ui.Text(c, a.opErr).FontSize(12).TextColor(t.Danger).Wrap()
@@ -482,7 +522,7 @@ func (a *app) view(c *ui.Context) {
 					ui.Text(c, a.err.Error()).TextColor(t.Danger)
 				case len(a.services) == 0:
 					ui.Column(c).Grow(1).Center().Children(func() {
-						ui.Text(c, "No services yet.").TextColor(t.TextMuted)
+						ui.Text(c, locales.NoServices()).TextColor(t.TextMuted)
 					})
 				default:
 					gap := t.Space(2)
@@ -505,7 +545,7 @@ func (a *app) view(c *ui.Context) {
 				ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
 					ui.Spacer(c).Grow(1)
 					if a.winsw == "" {
-						ui.Text(c, "winsw.exe missing").TextColor(t.Danger).FontSize(12)
+						ui.Text(c, locales.WinswMissing()).TextColor(t.Danger).FontSize(12)
 					}
 				})
 			})
@@ -543,31 +583,31 @@ func (a *app) dialogView(c *ui.Context) {
 			MaxWidth(winW-t.Space(10)).MaxHeight(winH-t.Space(10)).
 			Shadow(0, 10*p, 30*p, 0, ui.RGBA(0, 0, 0, 0.3*p)).
 			Scale(0.96+0.04*p, 0.96+0.04*p).Opacity(p)
-		title, action := "Add Service", "Add"
+		title, action := locales.AddService(), locales.Add()
 		if a.dialog == dialogEdit {
-			title, action = "Edit Service", "Save"
+			title, action = locales.EditService(), locales.Save()
 		}
 		ui.Text(c, title).FontSize(18).Bold()
-		name := ui.TextInput(c, &a.newName).Placeholder("Service name").
+		name := ui.TextInput(c, &a.newName).Placeholder(locales.ServiceName()).
 			Label("Name").AutoFocus().Width(w)
 		if a.dialog == dialogEdit {
-			name.Disabled(true).Tooltip("The service ID cannot be changed")
+			name.Disabled(true).Tooltip(locales.ServiceIDReadOnly())
 		}
 		var exe ui.Element
 		ui.Row(c).Gap(8).Width(w).Children(func() {
 			exe = ui.TextInput(c, &a.newExe).Placeholder(`C:\path\to\service.exe`).
 				Label("Executable").Grow(1)
-			if ui.Button(c, "Browse…").Cursor(ui.CursorPointer).Clicked() {
+			if ui.Button(c, locales.Browse()).Cursor(ui.CursorPointer).Clicked() {
 				a.pickExecutable()
 			}
 		})
-		args := ui.TextInput(c, &a.newArgs).Placeholder("Arguments (optional)").
+		args := ui.TextInput(c, &a.newArgs).Placeholder(locales.ArgumentsOptional()).
 			Label("Arguments").Width(w)
 		if a.dlgErr != "" {
 			ui.Text(c, a.dlgErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
 		}
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-			if ui.Button(c, "Cancel").Clicked() {
+			if ui.Button(c, locales.Cancel()).Clicked() {
 				a.closeDialog(c)
 			}
 			if ui.PrimaryButton(c, action).Clicked() ||
@@ -610,7 +650,7 @@ func (a *app) openAddDialog() {
 func (a *app) openEditDialog(name string) {
 	config := serviceConfig(a.dir, name)
 	if config == "" {
-		a.opErr = name + ": no WinSW configuration file"
+		a.opErr = name + ": " + locales.ErrNoConfig()
 		return
 	}
 	data, err := os.ReadFile(config)
@@ -649,9 +689,8 @@ func (a *app) closeDialog(c *ui.Context) {
 
 // deleteAlert asks before removing a service and its files.
 func (a *app) deleteAlert(c *ui.Context) {
-	switch ui.AlertDialog(c, &a.confirmDelete, "Delete “"+a.deleting+"”?",
-		"This removes its configuration and logs from the services folder.",
-		"Cancel", "Delete") {
+	switch ui.AlertDialog(c, &a.confirmDelete, locales.DeleteTitle(a.deleting),
+		locales.DeleteMessage(), locales.Cancel(), locales.DeleteAction()) {
 	case 1:
 		a.deleteService()
 	}
@@ -680,12 +719,12 @@ func (a *app) saveService() bool {
 	exe := strings.TrimSpace(a.newExe)
 	args := strings.TrimSpace(a.newArgs)
 	if exe == "" {
-		a.dlgErr = "The executable is required."
+		a.dlgErr = locales.ErrExecutable()
 		return false
 	}
 	config := serviceConfig(a.dir, name)
 	if config == "" {
-		a.dlgErr = "This service has no WinSW configuration file."
+		a.dlgErr = locales.ErrNoConfig()
 		return false
 	}
 	data, err := os.ReadFile(config)
@@ -813,9 +852,10 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 	t := c.Theme()
 	busy := a.busy[s.name]
 	status := s.status
+	label := statusLabel(status)
 	color := statusColor(t, status)
 	if busy {
-		status, color = "Working…", t.Accent
+		label, color = locales.Working(), t.Accent
 	}
 	card := ui.Column(c).Width(cardWidth).Height(cardHeight).Label(s.name).
 		Gap(10).Padding(14).Radius(12).Justify(ui.SpaceBetween)
@@ -847,7 +887,7 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 				ui.Text(c, s.name).Bold().SingleLine()
 				ui.Row(c).AlignItems(ui.Center).Gap(5).Children(func() {
 					ui.Box(c).Width(7).Height(7).Radius(4).Background(color)
-					ui.Text(c, string(status)).FontSize(12).TextColor(color).SingleLine()
+					ui.Text(c, label).FontSize(12).TextColor(color).SingleLine()
 				})
 			})
 		})
@@ -863,11 +903,11 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 		label, command := "", ""
 		switch s.status {
 		case statusRunning, statusPaused, statusStarting:
-			label, command = "Stop", "stop"
+			label, command = locales.Stop(), "stop"
 		case statusStopped:
-			label, command = "Start", "start"
+			label, command = locales.Start(), "start"
 		case statusNotInstalled:
-			label, command = "Install", "install"
+			label, command = locales.Install(), "install"
 		}
 		if label != "" {
 			var b ui.Element
@@ -881,20 +921,20 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 			}
 		}
 		editable := serviceConfig(a.dir, s.name) != ""
-		ui.Button(c, "More").Padding(3, 7).Cursor(ui.CursorPointer).
+		ui.Button(c, locales.More()).Padding(3, 7).Cursor(ui.CursorPointer).
 			Disabled(busy).Menu(func(m *ui.Menu) {
-			if m.Item("Edit…").Disabled(busy || !editable).Chosen() {
+			if m.Item(locales.Edit()).Disabled(busy || !editable).Chosen() {
 				a.openEditDialog(s.name)
 			}
 			m.Separator()
-			if m.Item("Restart").Disabled(busy || !installed).Chosen() {
+			if m.Item(locales.Restart()).Disabled(busy || !installed).Chosen() {
 				a.run(s.name, "restart")
 			}
-			if m.Item("Uninstall").Disabled(busy || s.status != statusStopped).Chosen() {
+			if m.Item(locales.Uninstall()).Disabled(busy || s.status != statusStopped).Chosen() {
 				a.run(s.name, "uninstall")
 			}
 			m.Separator()
-			if m.Item("Delete…").Disabled(busy || installed).Chosen() {
+			if m.Item(locales.Delete()).Disabled(busy || installed).Chosen() {
 				a.deleting = s.name
 				a.confirmDelete = true
 			}

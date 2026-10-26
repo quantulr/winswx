@@ -9,6 +9,8 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+
+	"mygo/locales"
 )
 
 // The view runs without a window in tests, which build it as a user would
@@ -45,7 +47,7 @@ func TestLoadServices(t *testing.T) {
 		if !tt.HasText(s.name) {
 			t.Errorf("texts %q do not show service %q", tt.Texts(), s.name)
 		}
-		if !tt.HasText(string(s.status)) {
+		if !tt.HasText(statusLabel(s.status)) {
 			t.Errorf("texts %q do not show the status of %q: %q", tt.Texts(), s.name, s.status)
 		}
 	}
@@ -71,7 +73,7 @@ func TestWinswBundled(t *testing.T) {
 func TestViewShowsServiceActions(t *testing.T) {
 	a := &app{services: []service{{name: "caddy", status: statusStopped}}}
 	tt := ui.NewTester(a.view, 480, 360)
-	for _, label := range []string{"caddy", "Stopped", "Start", "More"} {
+	for _, label := range []string{"caddy", statusLabel(statusStopped), locales.Start(), locales.More()} {
 		if !tt.HasText(label) {
 			t.Errorf("texts %q do not show %q", tt.Texts(), label)
 		}
@@ -79,7 +81,7 @@ func TestViewShowsServiceActions(t *testing.T) {
 
 	a = &app{services: []service{{name: "new", status: statusNotInstalled}}}
 	tt = ui.NewTester(a.view, 480, 360)
-	for _, label := range []string{"new", "Not installed", "Install", "More"} {
+	for _, label := range []string{"new", statusLabel(statusNotInstalled), locales.Install(), locales.More()} {
 		if !tt.HasText(label) {
 			t.Errorf("texts %q do not show %q", tt.Texts(), label)
 		}
@@ -166,7 +168,7 @@ func TestCardWidthFixed(t *testing.T) {
 		}
 		// The card's content ends inside its 1 DIP border and 14 DIP padding.
 		limit := card.X + card.W - 15
-		for _, label := range []string{"Stop", "More"} {
+		for _, label := range []string{locales.Stop(), locales.More()} {
 			r, ok := tt.Find(label)
 			if !ok {
 				t.Fatalf("width %d: %s not found", width, label)
@@ -183,7 +185,7 @@ func TestCardWidthFixed(t *testing.T) {
 func TestButtonsUsePointerCursor(t *testing.T) {
 	a := &app{services: []service{{name: "caddy", status: statusStopped}}}
 	tt := ui.NewTester(a.view, 480, 360)
-	for _, label := range []string{"Start", "More", "Refresh"} {
+	for _, label := range []string{locales.Start(), locales.More(), locales.Refresh()} {
 		r, ok := tt.Find(label)
 		if !ok {
 			t.Fatalf("%s not found", label)
@@ -287,10 +289,10 @@ func TestServiceXML(t *testing.T) {
 func TestAddDialogOpens(t *testing.T) {
 	a := &app{}
 	tt := ui.NewTester(a.view, 480, 360)
-	if err := tt.Click("Add Service"); err != nil {
+	if err := tt.Click(locales.AddService()); err != nil {
 		t.Fatalf("clicking Add Service: %v", err)
 	}
-	for _, want := range []string{"Browse…", "Cancel", "Add"} {
+	for _, want := range []string{locales.Browse(), locales.Cancel(), locales.Add()} {
 		if !tt.HasText(want) {
 			t.Errorf("texts %q do not show %q", tt.Texts(), want)
 		}
@@ -300,7 +302,7 @@ func TestAddDialogOpens(t *testing.T) {
 func TestCloseDialogAnimates(t *testing.T) {
 	a := &app{dir: t.TempDir(), winsw: "winsw.exe"}
 	tt := ui.NewTester(a.view, 480, 360)
-	if err := tt.Click("Add Service"); err != nil {
+	if err := tt.Click(locales.AddService()); err != nil {
 		t.Fatal(err)
 	}
 	tt.Advance(400 * time.Millisecond)
@@ -445,16 +447,16 @@ func TestDeleteServiceFromMenu(t *testing.T) {
 		services: []service{{name: "demo", status: statusNotInstalled}},
 	}
 	tt := ui.NewTester(a.view, 480, 360)
-	if err := tt.Click("More"); err != nil {
+	if err := tt.Click(locales.More()); err != nil {
 		t.Fatal(err)
 	}
-	if err := tt.ChooseMenuItem("Delete…"); err != nil {
+	if err := tt.ChooseMenuItem(locales.Delete()); err != nil {
 		t.Fatal(err)
 	}
 	if !a.confirmDelete {
 		t.Fatal("the delete alert did not open")
 	}
-	if err := tt.Click("Delete"); err != nil {
+	if err := tt.Click(locales.DeleteAction()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "demo")); !os.IsNotExist(err) {
