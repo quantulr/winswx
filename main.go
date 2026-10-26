@@ -34,6 +34,13 @@ type service struct {
 	status serviceStatus
 }
 
+// Cards keep their width as the window resizes: the grid adds or drops
+// columns instead.
+const (
+	cardWidth  = 200
+	cardHeight = 112
+)
+
 // app is the state the window shows. Its view builds the interface from
 // it, on the main thread, whenever the window needs a frame: after input,
 // after Window.Update, and while something animates.
@@ -46,7 +53,6 @@ type app struct {
 	err      error           // why the services could not be read, if they could not
 	win      *mygo.Window    // the window, nil before it is made
 	queryGen int             // counts status queries, so a stale one is ignored
-	grid     ui.GridState
 }
 
 // winswExe returns the path of the WinSW executable that ships with the
@@ -282,8 +288,6 @@ func firstLine(s string) string {
 
 func (a *app) view(c *ui.Context) {
 	t := c.Theme()
-	a.grid.Key = func(i int) any { return a.services[i].name }
-	a.grid.Label = func(i int) string { return a.services[i].name }
 	ui.Column(c).Fill().Gap(12).Padding(16, 20).Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
 			ui.Text(c, "Services").FontSize(20).Bold()
@@ -304,9 +308,22 @@ func (a *app) view(c *ui.Context) {
 				ui.Text(c, "No services yet.").TextColor(t.TextMuted)
 			})
 		default:
-			ui.GridView(c, &a.grid, len(a.services), 160, 112, func(i int) {
-				a.serviceCard(c, a.services[i])
-			}).Grow(1)
+			gap := t.Space(2)
+			winW, _ := c.Size()
+			avail := winW - 2*20 // the column's horizontal padding
+			cols := max(1, int((avail+gap)/(cardWidth+gap)))
+			tracks := make([]ui.Track, cols)
+			for i := range tracks {
+				tracks[i] = ui.Fixed(cardWidth)
+			}
+			ui.Scroll(c).Grow(1).Children(func() {
+				ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
+					Justify(ui.Start).Children(func() {
+					for _, s := range a.services {
+						a.serviceCard(c, s)
+					}
+				})
+			})
 		}
 		ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
 			ui.Text(c, a.dir).TextColor(t.TextMuted).FontSize(12)
@@ -328,7 +345,8 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 	if busy {
 		status, color = "Working…", t.Accent
 	}
-	card := ui.Column(c).Fill().Gap(10).Padding(14).Radius(10).
+	card := ui.Column(c).Width(cardWidth).Height(cardHeight).Label(s.name).
+		Gap(10).Padding(14).Radius(10).
 		Background(t.Surface).Border(1, t.Border)
 	if card.Hovered() {
 		card.Background(t.SurfaceHover)

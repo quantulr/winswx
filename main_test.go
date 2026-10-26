@@ -146,40 +146,36 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-// TestActionsFitCard checks that a card's actions stay inside it at any
-// window width: a GridView column is as narrow as 160 DIP at some widths.
-func TestActionsFitCard(t *testing.T) {
-	for _, c := range []struct {
-		width   float32
-		maxCard float32 // the widest the card may be, so the narrow case is narrow
-	}{
-		{480, 220},  // two columns
-		{1040, 170}, // six columns, close to the narrowest a card gets
-	} {
-		a := &app{services: []service{
-			{name: "caddy", status: statusRunning},
-			{name: "mihomo", status: statusRunning},
-		}}
-		tt := ui.NewTester(a.view, int(c.width), 360)
-		card, ok := tt.Find("caddy") // the grid labels the card's cell
+// TestCardWidthFixed checks that cards keep their width as the window
+// resizes, while the grid adds or drops columns, and that their actions
+// stay inside them.
+func TestCardWidthFixed(t *testing.T) {
+	a := &app{services: []service{
+		{name: "caddy", status: statusRunning},
+		{name: "mihomo", status: statusRunning},
+		{name: "clash", status: statusRunning},
+	}}
+	tt := ui.NewTester(a.view, 480, 360)
+	for _, width := range []int{480, 700, 900, 1200, 400, 320} {
+		tt.SetSize(width, 360)
+		card, ok := tt.Find("caddy") // the card is labeled with its service
 		if !ok {
-			t.Fatalf("width %v: card not found", c.width)
+			t.Fatalf("width %d: card not found", width)
 		}
-		if card.W > c.maxCard {
-			t.Fatalf("width %v: card is %v wide, want at most %v", c.width, card.W, c.maxCard)
+		if card.W != cardWidth {
+			t.Errorf("width %d: card is %v wide, want %v", width, card.W, cardWidth)
 		}
-		// The card's content ends inside the cell's 2 DIP border, its own
-		// 1 DIP border and 14 DIP padding.
-		limit := card.X + card.W - 17
+		// The card's content ends inside its 1 DIP border and 14 DIP padding.
+		limit := card.X + card.W - 15
 		for _, label := range []string{"Stop", "More"} {
 			r, ok := tt.Find(label)
 			if !ok {
-				t.Fatalf("width %v: %s not found", c.width, label)
+				t.Fatalf("width %d: %s not found", width, label)
 			}
 			// The text sits 7 DIP of padding and 1 DIP of border from the
 			// button's edge.
 			if right := r.X + r.W + 8; right > limit {
-				t.Errorf("width %v: %s ends at %.1f, past the card content at %.1f", c.width, label, right, limit)
+				t.Errorf("width %d: %s ends at %.1f, past the card content at %.1f", width, label, right, limit)
 			}
 		}
 	}
