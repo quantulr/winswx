@@ -14,14 +14,14 @@ magick -background none design/icon.svg "$tmp/background.png"
 
 letters=(w i n s w)
 colors=("#5FB3DE" "#FB7FA0" "#00A897" "#F0B94A" "#A966BA")
-angles=(-7 5 -4 6 -6)
-offsets=("-296+48" "-146+0" "-25+56" "+121+8" "+296+48")
+angles=(-8 5 -5 6 -7)
+offsets=("-222-137" "-57-167" "+98-132" "-17+138" "+178+108")
 
 args=()
 for i in "${!letters[@]}"; do
 	# Each letter, with a deep indigo outline that keeps it readable small.
-	magick -background none -font "$font" -pointsize 240 \
-		-stroke "#2B2440" -strokewidth 10 -fill "${colors[$i]}" \
+	magick -background none -font "$font" -pointsize 300 \
+		-stroke "#2B2440" -strokewidth 12 -fill "${colors[$i]}" \
 		label:"${letters[$i]}" -rotate "${angles[$i]}" "$tmp/$i.png"
 	args+=(\( "$tmp/$i.png" \) -gravity center -geometry "${offsets[$i]}" -composite)
 done
