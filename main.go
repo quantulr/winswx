@@ -325,54 +325,63 @@ func (a *app) view(c *ui.Context) {
 	// frosts.
 	base, glow := petalWash(t.Dark)
 	ui.Box(c).Fill().LinearGradient(base).Children(func() {
-		ui.Column(c).Fill().LinearGradient(glow).Gap(12).Padding(16, 20).Children(func() {
-			ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-				ui.Text(c, "Services").FontSize(20).Bold()
-				ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
-				ui.Spacer(c).Grow(1)
-				refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
-					Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
-					Material(glass.Glass{Interactive: true}).Children(func() {
-					ui.Icon(c, refreshIcon).FontSize(16)
-				})
-				if refresh.Clicked() {
-					a.load()
-				}
+		ui.Column(c).Fill().LinearGradient(glow).Children(func() {
+			// The view draws the title bar: a strip of glass under the
+			// window controls that drags the window.
+			bar := c.TitleBar()
+			ui.Row(c).Height(max(bar.Height, 32)).
+				Padding(0, bar.Right+20, 0, bar.Left+20).
+				AlignItems(ui.Center).DragWindow().Children(func() {
+				ui.Text(c, "winswx").FontSize(12).TextColor(t.TextMuted)
 			})
-			if a.opErr != "" {
-				ui.Text(c, a.opErr).FontSize(12).TextColor(t.Danger).Wrap()
-			}
-			switch {
-			case a.err != nil:
-				ui.Text(c, a.err.Error()).TextColor(t.Danger)
-			case len(a.services) == 0:
-				ui.Column(c).Grow(1).Center().Children(func() {
-					ui.Text(c, "No services yet.").TextColor(t.TextMuted)
-				})
-			default:
-				gap := t.Space(2)
-				winW, _ := c.Size()
-				avail := winW - 2*20 // the column's horizontal padding
-				cols := max(1, int((avail+gap)/(cardWidth+gap)))
-				tracks := make([]ui.Track, cols)
-				for i := range tracks {
-					tracks[i] = ui.Fixed(cardWidth)
-				}
-				ui.Scroll(c).Grow(1).Children(func() {
-					ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
-						Justify(ui.Start).Children(func() {
-						for _, s := range a.services {
-							a.serviceCard(c, s)
-						}
+			ui.Column(c).Grow(1).Gap(12).Padding(16, 20).Children(func() {
+				ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
+					ui.Text(c, "Services").FontSize(20).Bold()
+					ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
+					ui.Spacer(c).Grow(1)
+					refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
+						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
+						Material(glass.Glass{Interactive: true}).Children(func() {
+						ui.Icon(c, refreshIcon).FontSize(16)
 					})
+					if refresh.Clicked() {
+						a.load()
+					}
 				})
-			}
-			ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-				ui.Text(c, a.dir).TextColor(t.TextMuted).FontSize(12)
-				ui.Spacer(c).Grow(1)
-				if a.winsw == "" {
-					ui.Text(c, "winsw.exe missing").TextColor(t.Danger).FontSize(12)
+				if a.opErr != "" {
+					ui.Text(c, a.opErr).FontSize(12).TextColor(t.Danger).Wrap()
 				}
+				switch {
+				case a.err != nil:
+					ui.Text(c, a.err.Error()).TextColor(t.Danger)
+				case len(a.services) == 0:
+					ui.Column(c).Grow(1).Center().Children(func() {
+						ui.Text(c, "No services yet.").TextColor(t.TextMuted)
+					})
+				default:
+					gap := t.Space(2)
+					winW, _ := c.Size()
+					avail := winW - 2*20 // the column's horizontal padding
+					cols := max(1, int((avail+gap)/(cardWidth+gap)))
+					tracks := make([]ui.Track, cols)
+					for i := range tracks {
+						tracks[i] = ui.Fixed(cardWidth)
+					}
+					ui.Scroll(c).Grow(1).Children(func() {
+						ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
+							Justify(ui.Start).Children(func() {
+							for _, s := range a.services {
+								a.serviceCard(c, s)
+							}
+						})
+					})
+				}
+				ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
+					ui.Spacer(c).Grow(1)
+					if a.winsw == "" {
+						ui.Text(c, "winsw.exe missing").TextColor(t.Danger).FontSize(12)
+					}
+				})
 			})
 		})
 	})
@@ -471,11 +480,12 @@ func main() {
 	a.load()
 	mygo.App.WhenReady(func() {
 		win := mygo.NewWindow(mygo.WindowOptions{
-			Title:     "winswx",
-			Width:     480,
-			Height:    360,
-			MinWidth:  320,
-			MinHeight: 280,
+			Title:         "winswx",
+			TitleBarStyle: mygo.TitleBarHidden,
+			Width:         480,
+			Height:        360,
+			MinWidth:      320,
+			MinHeight:     280,
 			// Opens where the user left it last time.
 			StateKey: "main",
 			// The window shows the interface MyGo draws, not a web page.
