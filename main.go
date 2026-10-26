@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -26,6 +27,10 @@ const (
 	statusNotInstalled serviceStatus = "Not installed"
 	statusUnknown      serviceStatus = "Unknown"
 )
+
+// refreshIcon is a clockwise refresh arrow, drawn in the text color of
+// the button that shows it.
+var refreshIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`))
 
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
@@ -286,51 +291,88 @@ func firstLine(s string) string {
 	return ""
 }
 
+// petalWash returns kero's petal backdrop: a wash of lavender, rose and
+// cream in the light, and of deep plum in the dark, lit from the top
+// right.
+func petalWash(dark bool) (base, glow ui.LinearGradient) {
+	stops := func(hexes ...string) []ui.GradientStop {
+		out := make([]ui.GradientStop, len(hexes))
+		for i, h := range hexes {
+			out[i] = ui.GradientStop{Color: ui.Hex(h), At: float32(i) / float32(len(hexes)-1)}
+		}
+		return out
+	}
+	glowOf := func(c ui.Color) ui.LinearGradient {
+		return ui.LinearGradient{Angle: 225, Oklab: true, Stops: []ui.GradientStop{
+			{Color: c, At: 0},
+			{Color: c.Alpha(0), At: 0.5},
+		}}
+	}
+	if dark {
+		return ui.LinearGradient{Angle: 180, Oklab: true,
+				Stops: stops("#17141f", "#191620", "#1b1916")},
+			glowOf(ui.RGBA(120, 70, 120, 0.22))
+	}
+	return ui.LinearGradient{Angle: 180, Oklab: true,
+			Stops: stops("#ebe0f3", "#f3e7f1", "#f7eee4", "#f6efcf")},
+		glowOf(ui.RGBA(247, 220, 241, 0.75))
+}
+
 func (a *app) view(c *ui.Context) {
 	t := c.Theme()
-	ui.Column(c).Fill().Gap(12).Padding(16, 20).Children(func() {
-		ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-			ui.Text(c, "Services").FontSize(20).Bold()
-			ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
-			ui.Spacer(c).Grow(1)
-			if ui.Button(c, "Refresh").Clicked() {
-				a.load()
-			}
-		})
-		if a.opErr != "" {
-			ui.Text(c, a.opErr).FontSize(12).TextColor(t.Danger).Wrap()
-		}
-		switch {
-		case a.err != nil:
-			ui.Text(c, a.err.Error()).TextColor(t.Danger)
-		case len(a.services) == 0:
-			ui.Column(c).Grow(1).Center().Children(func() {
-				ui.Text(c, "No services yet.").TextColor(t.TextMuted)
-			})
-		default:
-			gap := t.Space(2)
-			winW, _ := c.Size()
-			avail := winW - 2*20 // the column's horizontal padding
-			cols := max(1, int((avail+gap)/(cardWidth+gap)))
-			tracks := make([]ui.Track, cols)
-			for i := range tracks {
-				tracks[i] = ui.Fixed(cardWidth)
-			}
-			ui.Scroll(c).Grow(1).Children(func() {
-				ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
-					Justify(ui.Start).Children(func() {
-					for _, s := range a.services {
-						a.serviceCard(c, s)
-					}
+	// kero's petal wash, which the glass of the Refresh button bends and
+	// frosts.
+	base, glow := petalWash(t.Dark)
+	ui.Box(c).Fill().LinearGradient(base).Children(func() {
+		ui.Column(c).Fill().LinearGradient(glow).Gap(12).Padding(16, 20).Children(func() {
+			ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
+				ui.Text(c, "Services").FontSize(20).Bold()
+				ui.Textf(c, "%d", len(a.services)).TextColor(t.TextMuted)
+				ui.Spacer(c).Grow(1)
+				refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
+					Padding(6, 8).BorderWidth(0).Radius(10).
+					Material(glass.Glass{Interactive: true}).Children(func() {
+					ui.Icon(c, refreshIcon).FontSize(16)
 				})
+				if refresh.Clicked() {
+					a.load()
+				}
 			})
-		}
-		ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-			ui.Text(c, a.dir).TextColor(t.TextMuted).FontSize(12)
-			ui.Spacer(c).Grow(1)
-			if a.winsw == "" {
-				ui.Text(c, "winsw.exe missing").TextColor(t.Danger).FontSize(12)
+			if a.opErr != "" {
+				ui.Text(c, a.opErr).FontSize(12).TextColor(t.Danger).Wrap()
 			}
+			switch {
+			case a.err != nil:
+				ui.Text(c, a.err.Error()).TextColor(t.Danger)
+			case len(a.services) == 0:
+				ui.Column(c).Grow(1).Center().Children(func() {
+					ui.Text(c, "No services yet.").TextColor(t.TextMuted)
+				})
+			default:
+				gap := t.Space(2)
+				winW, _ := c.Size()
+				avail := winW - 2*20 // the column's horizontal padding
+				cols := max(1, int((avail+gap)/(cardWidth+gap)))
+				tracks := make([]ui.Track, cols)
+				for i := range tracks {
+					tracks[i] = ui.Fixed(cardWidth)
+				}
+				ui.Scroll(c).Grow(1).Children(func() {
+					ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
+						Justify(ui.Start).Children(func() {
+						for _, s := range a.services {
+							a.serviceCard(c, s)
+						}
+					})
+				})
+			}
+			ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
+				ui.Text(c, a.dir).TextColor(t.TextMuted).FontSize(12)
+				ui.Spacer(c).Grow(1)
+				if a.winsw == "" {
+					ui.Text(c, "winsw.exe missing").TextColor(t.Danger).FontSize(12)
+				}
+			})
 		})
 	})
 }
