@@ -398,7 +398,7 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 		status, color = "Working…", t.Accent
 	}
 	card := ui.Column(c).Width(cardWidth).Height(cardHeight).Label(s.name).
-		Gap(10).Padding(14).Radius(12)
+		Gap(10).Padding(14).Radius(12).Justify(ui.SpaceBetween)
 	// The shadow deepens and a faint tint fades in as the pointer comes
 	// over the card, and both ease back as it leaves.
 	lift := float32(0)
