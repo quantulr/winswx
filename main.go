@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -64,15 +66,26 @@ type app struct {
 	win      *mygo.Window    // the window, nil before it is made
 	queryGen int             // counts status queries, so a stale one is ignored
 
-	adding    bool    // the Add Service dialog is built
-	addOpen   bool    // DialogBase's open flag
-	addTarget float32 // 1 shown, 0 closing
-	addFresh  bool    // seed the opening animation
-	newName   string  // the name in the dialog
-	newExe    string  // the executable in the dialog
-	newArgs   string  // the arguments in the dialog
-	addErr    string  // why the service could not be added
+	dialog    dialogMode // the dialog that shows, none when closed
+	editDir   string     // the directory of the service being edited
+	dlgOpen   bool       // DialogBase's open flag
+	dlgTarget float32    // 1 shown, 0 closing
+	dlgFresh  bool       // seed the opening animation
+	newName   string     // the name in the dialog
+	newExe    string     // the executable in the dialog
+	newArgs   string     // the arguments in the dialog
+	dlgErr    string     // why the dialog could not be saved
 }
+
+// dialogMode names the form the dialog shows.
+type dialogMode uint8
+
+// The forms of the dialog.
+const (
+	dialogNone dialogMode = iota
+	dialogAdd
+	dialogEdit
+)
 
 // winswExe returns the path of the WinSW executable that ships with the
 // app in its resources.
@@ -205,24 +218,24 @@ func (a *app) addService() bool {
 	exe := strings.TrimSpace(a.newExe)
 	args := strings.TrimSpace(a.newArgs)
 	if msg := validateServiceName(name); msg != "" {
-		a.addErr = msg
+		a.dlgErr = msg
 		return false
 	}
 	if exe == "" {
-		a.addErr = "The executable is required."
+		a.dlgErr = "The executable is required."
 		return false
 	}
 	if a.dir == "" {
-		a.addErr = "The services directory is not available."
+		a.dlgErr = "The services directory is not available."
 		return false
 	}
 	dir := filepath.Join(a.dir, name)
 	if _, err := os.Stat(dir); err == nil {
-		a.addErr = "A service named " + name + " already exists."
+		a.dlgErr = "A service named " + name + " already exists."
 		return false
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		a.addErr = err.Error()
+		a.dlgErr = err.Error()
 		return false
 	}
 	config := filepath.Join(dir, name+".xml")
@@ -232,10 +245,10 @@ func (a *app) addService() bool {
 	}
 	if err != nil {
 		_ = os.RemoveAll(dir) // do not leave half a service behind
-		a.addErr = err.Error()
+		a.dlgErr = err.Error()
 		return false
 	}
-	a.addErr = ""
+	a.dlgErr = ""
 	a.newName, a.newExe, a.newArgs = "", "", ""
 	a.load()
 	return true
@@ -448,12 +461,7 @@ func (a *app) view(c *ui.Context) {
 						ui.Icon(c, plusIcon).FontSize(16)
 					})
 					if add.Clicked() {
-						a.adding = true
-						a.addOpen = true
-						a.addTarget = 0
-						a.addFresh = true
-						a.addErr = ""
-						a.newName, a.newExe, a.newArgs = "", "", ""
+						a.openAddDialog()
 					}
 					refresh := ui.Button(c, "").Label("Refresh").Tooltip("Refresh").
 						Padding(6, 8).BorderWidth(0).Radius(10).Cursor(ui.CursorPointer).
@@ -501,28 +509,28 @@ func (a *app) view(c *ui.Context) {
 			})
 		})
 	})
-	a.addDialog(c)
+	a.dialogView(c)
 }
 
-// addDialog asks for the name, executable and arguments of a new service.
-func (a *app) addDialog(c *ui.Context) {
-	if !a.adding {
+// dialogView shows the Add or Edit Service form, easing it in and out.
+func (a *app) dialogView(c *ui.Context) {
+	if a.dialog == dialogNone {
 		return
 	}
-	a.addOpen = true
+	a.dlgOpen = true
 	t := c.Theme()
 	winW, winH := c.Size()
 	w := min(360, max(160, winW-80)) // the panel keeps 20 DIP of padding aside
-	ui.DialogBase(c, &a.addOpen, func(backdrop, panel ui.Element) {
+	ui.DialogBase(c, &a.dlgOpen, func(backdrop, panel ui.Element) {
 		anim := ui.Animation{Duration: 160 * time.Millisecond, Ease: ui.EaseOut}
-		target := a.addTarget
+		target := a.dlgTarget
 		p := panel.AnimateTo("in", target, anim)
 		dim := backdrop.AnimateTo("dim", target, anim)
-		if a.addFresh {
+		if a.dlgFresh {
 			// An animated value starts at its first target: show the
 			// dialog at zero for a frame, then ease it in on the next.
-			a.addFresh = false
-			a.addTarget = 1
+			a.dlgFresh = false
+			a.dlgTarget = 1
 			c.Invalidate()
 		}
 		p = min(1, max(0, p))
@@ -532,9 +540,16 @@ func (a *app) addDialog(c *ui.Context) {
 			MaxWidth(winW-t.Space(10)).MaxHeight(winH-t.Space(10)).
 			Shadow(0, 10*p, 30*p, 0, ui.RGBA(0, 0, 0, 0.3*p)).
 			Scale(0.96+0.04*p, 0.96+0.04*p).Opacity(p)
-		ui.Text(c, "Add Service").FontSize(18).Bold()
+		title, action := "Add Service", "Add"
+		if a.dialog == dialogEdit {
+			title, action = "Edit Service", "Save"
+		}
+		ui.Text(c, title).FontSize(18).Bold()
 		name := ui.TextInput(c, &a.newName).Placeholder("Service name").
 			Label("Name").AutoFocus().Width(w)
+		if a.dialog == dialogEdit {
+			name.Disabled(true).Tooltip("The service ID cannot be changed")
+		}
 		var exe ui.Element
 		ui.Row(c).Gap(8).Width(w).Children(func() {
 			exe = ui.TextInput(c, &a.newExe).Placeholder(`C:\path\to\service.exe`).
@@ -545,40 +560,196 @@ func (a *app) addDialog(c *ui.Context) {
 		})
 		args := ui.TextInput(c, &a.newArgs).Placeholder("Arguments (optional)").
 			Label("Arguments").Width(w)
-		if a.addErr != "" {
-			ui.Text(c, a.addErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
+		if a.dlgErr != "" {
+			ui.Text(c, a.dlgErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
 		}
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
 			if ui.Button(c, "Cancel").Clicked() {
-				a.closeAddDialog(c)
+				a.closeDialog(c)
 			}
-			if ui.PrimaryButton(c, "Add").Clicked() ||
+			if ui.PrimaryButton(c, action).Clicked() ||
 				name.Submitted() || exe.Submitted() || args.Submitted() {
-				if a.addService() {
-					a.closeAddDialog(c)
+				saved := false
+				if a.dialog == dialogEdit {
+					saved = a.saveService()
+				} else {
+					saved = a.addService()
+				}
+				if saved {
+					a.closeDialog(c)
 				}
 			}
 		})
 		// Faded away: take the dialog out of the tree.
-		if a.addTarget == 0 && p < 0.01 {
-			a.adding = false
-			a.addOpen = false
+		if a.dlgTarget == 0 && p < 0.01 {
+			a.dialog = dialogNone
+			a.dlgOpen = false
 		}
 	})
-	if !a.addOpen {
+	if !a.dlgOpen {
 		// A click outside or Escape closed it: ease it out.
-		a.closeAddDialog(c)
+		a.closeDialog(c)
 	}
 }
 
-// closeAddDialog keeps the dialog built while it eases out.
-func (a *app) closeAddDialog(c *ui.Context) {
-	if a.addTarget == 0 {
+// openAddDialog shows the form of a new service.
+func (a *app) openAddDialog() {
+	a.dialog = dialogAdd
+	a.dlgOpen = true
+	a.dlgTarget = 0
+	a.dlgFresh = true
+	a.dlgErr = ""
+	a.newName, a.newExe, a.newArgs = "", "", ""
+}
+
+// openEditDialog shows the form of an existing service, filled in from
+// its WinSW configuration.
+func (a *app) openEditDialog(name string) {
+	config := serviceConfig(a.dir, name)
+	if config == "" {
+		a.opErr = name + ": no WinSW configuration file"
 		return
 	}
-	a.addOpen = true
-	a.addTarget = 0
+	data, err := os.ReadFile(config)
+	if err != nil {
+		a.opErr = err.Error()
+		return
+	}
+	var cfg struct {
+		Executable string `xml:"executable"`
+		Arguments  string `xml:"arguments"`
+	}
+	if err := xml.Unmarshal(data, &cfg); err != nil {
+		a.opErr = name + ": " + err.Error()
+		return
+	}
+	a.dialog = dialogEdit
+	a.editDir = name
+	a.dlgOpen = true
+	a.dlgTarget = 0
+	a.dlgFresh = true
+	a.dlgErr = ""
+	a.newName = name
+	a.newExe = cfg.Executable
+	a.newArgs = cfg.Arguments
+}
+
+// closeDialog keeps the dialog built while it eases out.
+func (a *app) closeDialog(c *ui.Context) {
+	if a.dlgTarget == 0 {
+		return
+	}
+	a.dlgOpen = true
+	a.dlgTarget = 0
 	c.Invalidate()
+}
+
+// saveService applies the dialog's fields to the service being edited.
+// Its ID never changes: the fields that shadow it are ignored.
+func (a *app) saveService() bool {
+	name := a.editDir
+	exe := strings.TrimSpace(a.newExe)
+	args := strings.TrimSpace(a.newArgs)
+	if exe == "" {
+		a.dlgErr = "The executable is required."
+		return false
+	}
+	config := serviceConfig(a.dir, name)
+	if config == "" {
+		a.dlgErr = "This service has no WinSW configuration file."
+		return false
+	}
+	data, err := os.ReadFile(config)
+	if err != nil {
+		a.dlgErr = err.Error()
+		return false
+	}
+	updated, err := updateServiceXML(data, name, exe, args)
+	if err != nil {
+		a.dlgErr = err.Error()
+		return false
+	}
+	if err := os.WriteFile(config, updated, 0o644); err != nil {
+		a.dlgErr = err.Error()
+		return false
+	}
+	a.dlgErr = ""
+	a.newName, a.newExe, a.newArgs = "", "", ""
+	a.load()
+	return true
+}
+
+// updateServiceXML returns WinSW configuration data with the id,
+// executable and arguments replaced, keeping the other elements as they
+// are.
+func updateServiceXML(data []byte, id, executable, arguments string) ([]byte, error) {
+	values := map[string]string{"id": id, "executable": executable, "arguments": arguments}
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	var out bytes.Buffer
+	out.WriteString(xml.Header)
+	enc := xml.NewEncoder(&out)
+	found := make(map[string]bool, len(values))
+	depth := 0
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch t := tok.(type) {
+		case xml.ProcInst:
+			if strings.EqualFold(t.Target, "xml") {
+				continue // the header is already written
+			}
+		case xml.StartElement:
+			if value, ok := values[t.Name.Local]; ok && depth == 1 {
+				found[t.Name.Local] = true
+				if t.Name.Local == "arguments" && arguments == "" {
+					if err := dec.Skip(); err != nil {
+						return nil, err
+					}
+					continue
+				}
+				if err := enc.EncodeToken(t); err != nil {
+					return nil, err
+				}
+				if err := enc.EncodeToken(xml.CharData(value)); err != nil {
+					return nil, err
+				}
+				if err := enc.EncodeToken(t.End()); err != nil {
+					return nil, err
+				}
+				if err := dec.Skip(); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			depth++
+		case xml.EndElement:
+			depth--
+			if depth == 0 {
+				for _, name := range []string{"id", "executable", "arguments"} {
+					if found[name] || (name == "arguments" && arguments == "") {
+						continue
+					}
+					start := xml.StartElement{Name: xml.Name{Local: name}}
+					_ = enc.EncodeToken(xml.CharData("\n  "))
+					_ = enc.EncodeToken(start)
+					_ = enc.EncodeToken(xml.CharData(values[name]))
+					_ = enc.EncodeToken(start.End())
+				}
+			}
+		}
+		if err := enc.EncodeToken(tok); err != nil {
+			return nil, err
+		}
+	}
+	if err := enc.Flush(); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 // pickExecutable asks for the executable of the service with the system's
@@ -598,10 +769,10 @@ func (a *app) pickExecutable() {
 		win.Update(func() {
 			switch {
 			case err != nil:
-				a.addErr = err.Error()
+				a.dlgErr = err.Error()
 			case len(paths) > 0:
 				a.newExe = paths[0]
-				a.addErr = ""
+				a.dlgErr = ""
 			}
 		})
 	}()
@@ -680,18 +851,20 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 				a.run(s.name, command)
 			}
 		}
-		if installed {
-			ui.Button(c, "More").Padding(3, 7).Cursor(ui.CursorPointer).
-				Disabled(busy).Menu(func(m *ui.Menu) {
-				if m.Item("Restart").Disabled(busy).Chosen() {
-					a.run(s.name, "restart")
-				}
-				m.Separator()
-				if m.Item("Uninstall").Disabled(busy || s.status != statusStopped).Chosen() {
-					a.run(s.name, "uninstall")
-				}
-			})
-		}
+		editable := serviceConfig(a.dir, s.name) != ""
+		ui.Button(c, "More").Padding(3, 7).Cursor(ui.CursorPointer).
+			Disabled(busy).Menu(func(m *ui.Menu) {
+			if m.Item("Edit…").Disabled(busy || !editable).Chosen() {
+				a.openEditDialog(s.name)
+			}
+			m.Separator()
+			if m.Item("Restart").Disabled(busy || !installed).Chosen() {
+				a.run(s.name, "restart")
+			}
+			if m.Item("Uninstall").Disabled(busy || s.status != statusStopped).Chosen() {
+				a.run(s.name, "uninstall")
+			}
+		})
 	})
 }
 

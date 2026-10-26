@@ -79,13 +79,10 @@ func TestViewShowsServiceActions(t *testing.T) {
 
 	a = &app{services: []service{{name: "new", status: statusNotInstalled}}}
 	tt = ui.NewTester(a.view, 480, 360)
-	for _, label := range []string{"new", "Not installed", "Install"} {
+	for _, label := range []string{"new", "Not installed", "Install", "More"} {
 		if !tt.HasText(label) {
 			t.Errorf("texts %q do not show %q", tt.Texts(), label)
 		}
-	}
-	if tt.HasText("More") {
-		t.Errorf("texts %q show More for a service that is not installed", tt.Texts())
 	}
 }
 
@@ -211,7 +208,7 @@ func TestAddService(t *testing.T) {
 	a.newExe = `C:\Tools\demo.exe`
 	a.newArgs = "-port 8080"
 	if !a.addService() {
-		t.Fatalf("addService: %s", a.addErr)
+		t.Fatalf("addService: %s", a.dlgErr)
 	}
 	data, err := os.ReadFile(filepath.Join(userData, "services", "demo", "demo.xml"))
 	if err != nil {
@@ -259,9 +256,9 @@ func TestAddServiceValidation(t *testing.T) {
 		{" name", `C:\x.exe`},
 		{"ok", ""},
 	} {
-		a.newName, a.newExe, a.newArgs, a.addErr = c.name, c.exe, "", ""
+		a.newName, a.newExe, a.newArgs, a.dlgErr = c.name, c.exe, "", ""
 		a.addService()
-		if a.addErr == "" {
+		if a.dlgErr == "" {
 			t.Errorf("addService(name %q, exe %q) was accepted", c.name, c.exe)
 		}
 	}
@@ -309,11 +306,97 @@ func TestCloseDialogAnimates(t *testing.T) {
 	tt.Advance(400 * time.Millisecond)
 	tt.Key(0, ui.KeyEscape)
 	tt.Advance(40 * time.Millisecond)
-	if !a.adding {
+	if a.dialog == dialogNone {
 		t.Fatal("the dialog was removed before its closing animation")
 	}
 	tt.Advance(400 * time.Millisecond)
-	if a.adding {
+	if a.dialog != dialogNone {
 		t.Fatal("the dialog stayed after its closing animation")
+	}
+}
+
+func TestUpdateServiceXML(t *testing.T) {
+	in := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<service>
+  <id>old</id>
+  <executable>C:\old.exe</executable>
+  <arguments>-old</arguments>
+  <log mode="roll-by-size"/>
+  <serviceaccount>
+    <username>LocalSystem</username>
+  </serviceaccount>
+</service>`)
+	out, err := updateServiceXML(in, "new", `C:\new.exe`, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"<id>new</id>",
+		`<executable>C:\new.exe</executable>`,
+		`mode="roll-by-size"`,
+		"<username>LocalSystem</username>",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("configuration %q does not contain %q", text, want)
+		}
+	}
+	if strings.Contains(text, "<arguments>") || strings.Contains(text, "-old") {
+		t.Errorf("configuration %q kept the old arguments", text)
+	}
+
+	out, err = updateServiceXML(in, "new", `C:\new.exe`, "-x 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "<arguments>-x 1</arguments>") {
+		t.Errorf("configuration %q does not set the arguments", out)
+	}
+}
+
+func TestEditService(t *testing.T) {
+	userData := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, userData)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	a := &app{}
+	a.load()
+	a.newName = "demo"
+	a.newExe = `C:\old.exe`
+	a.newArgs = "-old"
+	if !a.addService() {
+		t.Fatalf("addService: %s", a.dlgErr)
+	}
+
+	a.openEditDialog("demo")
+	if a.dialog != dialogEdit || a.newName != "demo" || a.newExe != `C:\old.exe` || a.newArgs != "-old" {
+		t.Fatalf("edit dialog got name %q, exe %q and args %q", a.newName, a.newExe, a.newArgs)
+	}
+
+	// The ID cannot change: a name typed into the dialog is ignored.
+	a.newName = "renamed"
+	a.newExe = `C:\new.exe`
+	a.newArgs = "-new"
+	if !a.saveService() {
+		t.Fatalf("saveService: %s", a.dlgErr)
+	}
+	if _, err := os.Stat(filepath.Join(userData, "services", "demo")); err != nil {
+		t.Errorf("the service directory went away: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(userData, "services", "renamed")); !os.IsNotExist(err) {
+		t.Errorf("a renamed directory appeared: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(userData, "services", "demo", "demo.xml"))
+	if err != nil {
+		t.Fatalf("reading the configuration: %v", err)
+	}
+	for _, want := range []string{
+		"<id>demo</id>",
+		`<executable>C:\new.exe</executable>`,
+		"<arguments>-new</arguments>",
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("configuration %q does not contain %q", data, want)
+		}
 	}
 }
