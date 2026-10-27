@@ -94,7 +94,9 @@ type app struct {
 	dialog        dialogMode // the dialog that shows, none when closed
 	editDir       string     // the directory of the service being edited
 	moreName      string     // the service whose More menu is open
-	moreOpen      bool       // the More menu shows
+	moreOpen      bool       // the More menu is built
+	moreTarget    float32    // 1 shown, 0 closing
+	moreFresh     bool       // seed the opening animation
 	deleting      string     // the service asked about for deletion
 	confirmDelete bool       // the delete alert shows
 	dlgOpen       bool       // DialogBase's open flag
@@ -954,47 +956,78 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 		more := actionButton(c, false, moreIcon, locales.More()).
 			Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy)
 		if more.Clicked() {
-			a.moreName, a.moreOpen = s.name, !a.moreOpen
+			if a.moreName == s.name && a.moreOpen {
+				a.closeMore(c)
+			} else {
+				a.moreName, a.moreOpen = s.name, true
+				a.moreTarget, a.moreFresh = 0, true
+			}
 		}
 		if a.moreName == s.name && a.moreOpen {
+			finished := false
 			ui.PopoverBase(c, more, &a.moreOpen, func(panel ui.Element) {
 				t := c.Theme()
-				shade, edge := float32(0.35), t.Text.Alpha(0.12)
+				anim := ui.Animation{Duration: 140 * time.Millisecond, Ease: ui.EaseOut}
+				p := panel.AnimateTo("in", a.moreTarget, anim)
+				if a.moreFresh {
+					a.moreFresh = false
+					a.moreTarget = 1
+					c.Invalidate()
+				}
+				p = min(1, max(0, p))
+				shade, edge := float32(0.35), float32(0.12)
 				if t.Dark {
-					shade, edge = 0.60, t.Text.Alpha(0.18)
+					shade, edge = 0.60, 0.18
 				}
 				panel.Padding(6).Radius(14).MinWidth(170).
-					Shadow(0, 8, 20, 0, ui.RGBA(0, 0, 0, shade)).
-					Border(1, edge).
+					Opacity(p).
+					Scale(0.97+0.03*p, 0.97+0.03*p).
+					Shadow(0, 8*p, 20*p, 0, ui.RGBA(0, 0, 0, shade*p)).
+					Border(1, t.Text.Alpha(edge*p)).
 					Material(glass.Glass{})
 				if menuItem(c, editIcon, locales.Edit(), !busy && editable) {
-					a.closeMore()
+					a.closeMore(c)
 					a.openEditDialog(s.name)
 				}
 				menuSeparator(c)
 				if menuItem(c, restartIcon, locales.Restart(), !busy && installed) {
-					a.closeMore()
+					a.closeMore(c)
 					a.run(s.name, "restart")
 				}
 				if menuItem(c, uninstallIcon, locales.Uninstall(), !busy && s.status == statusStopped) {
-					a.closeMore()
+					a.closeMore(c)
 					a.run(s.name, "uninstall")
 				}
 				menuSeparator(c)
 				if menuItem(c, trashIcon, locales.Delete(), !busy && !installed) {
-					a.closeMore()
+					a.closeMore(c)
 					a.deleting = s.name
 					a.confirmDelete = true
 				}
+				if a.moreTarget == 0 && p < 0.01 {
+					// Faded away: take it out of the tree.
+					a.moreOpen = false
+					a.moreName = ""
+					finished = true
+				}
 			})
+			if !a.moreOpen && !finished {
+				// A press outside or Escape closed it: ease it out.
+				a.moreOpen, a.moreTarget = true, 0
+				c.Invalidate()
+			}
 		}
 	})
 }
 
-// closeMore closes the More menu.
-func (a *app) closeMore() {
-	a.moreOpen = false
-	a.moreName = ""
+// closeMore eases the More menu out, keeping it built until it fades.
+func (a *app) closeMore(c *ui.Context) {
+	if a.moreTarget == 0 {
+		return // already closing
+	}
+	a.moreOpen = true
+	a.moreTarget = 0
+	c.Invalidate()
 }
 
 // menuItem draws a row of the More menu, which it reports a click of. A

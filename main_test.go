@@ -466,3 +466,62 @@ func TestDeleteServiceFromMenu(t *testing.T) {
 		t.Error("the delete alert stayed open")
 	}
 }
+
+func TestMoreMenuAnimates(t *testing.T) {
+	a := &app{dir: t.TempDir(), winsw: "winsw.exe",
+		services: []service{{name: "caddy", status: statusStopped}}}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click(locales.More()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(250 * time.Millisecond)
+	if !a.moreOpen {
+		t.Fatal("the menu did not open")
+	}
+	if err := tt.Click(locales.More()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(40 * time.Millisecond)
+	if !a.moreOpen {
+		t.Fatal("the menu was removed before its closing animation")
+	}
+	tt.Advance(300 * time.Millisecond)
+	if a.moreOpen {
+		t.Fatal("the menu stayed after its closing animation")
+	}
+}
+
+// TestMoreMenuClosesOutside checks that a press outside the popover eases
+// it out instead of reopening it.
+func TestMoreMenuClosesOutside(t *testing.T) {
+	a := &app{dir: t.TempDir(), winsw: "winsw.exe",
+		services: []service{{name: "caddy", status: statusStopped}}}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click(locales.More()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(250 * time.Millisecond)
+	if !a.moreOpen {
+		t.Fatal("the menu did not open")
+	}
+	tt.ClickAt(30, 60)
+	tt.Advance(300 * time.Millisecond)
+	if a.moreOpen {
+		t.Fatal("a press outside did not close the menu")
+	}
+}
+
+func TestMoreMenuClosesOnEscape(t *testing.T) {
+	a := &app{dir: t.TempDir(), winsw: "winsw.exe",
+		services: []service{{name: "caddy", status: statusStopped}}}
+	tt := ui.NewTester(a.view, 480, 360)
+	if err := tt.Click(locales.More()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(250 * time.Millisecond)
+	tt.Key(0, ui.KeyEscape)
+	tt.Advance(300 * time.Millisecond)
+	if a.moreOpen {
+		t.Fatal("Escape did not close the menu")
+	}
+}
