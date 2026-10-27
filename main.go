@@ -958,7 +958,14 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 		}
 		if a.moreName == s.name && a.moreOpen {
 			ui.PopoverBase(c, more, &a.moreOpen, func(panel ui.Element) {
+				t := c.Theme()
+				shade, edge := float32(0.35), t.Text.Alpha(0.12)
+				if t.Dark {
+					shade, edge = 0.60, t.Text.Alpha(0.18)
+				}
 				panel.Padding(6).Radius(14).MinWidth(170).
+					Shadow(0, 8, 20, 0, ui.RGBA(0, 0, 0, shade)).
+					Border(1, edge).
 					Material(glass.Glass{})
 				if menuItem(c, editIcon, locales.Edit(), !busy && editable) {
 					a.closeMore()
