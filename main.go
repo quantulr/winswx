@@ -64,6 +64,21 @@ var (
 	trashIcon     = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`))
 )
 
+// avatarColors are the colors a service's badge picks from, by its name.
+var avatarColors = []ui.Color{
+	ui.Hex("#3D9BD1"), // zenith blue
+	ui.Hex("#EE5F86"), // coral pink
+	ui.Hex("#009B8B"), // vivid green
+	ui.Hex("#CE8F24"), // orange yellow
+	ui.Hex("#9455B0"), // indigo purple
+}
+
+// avatarColor picks the badge color of the service at index i, so that
+// the services in view do not share one.
+func avatarColor(i int) ui.Color {
+	return avatarColors[i%len(avatarColors)]
+}
+
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
 type service struct {
@@ -558,8 +573,8 @@ func (a *app) view(c *ui.Context) {
 					ui.Scroll(c).Grow(1).Children(func() {
 						ui.Grid(c).FillWidth().ColumnTracks(tracks...).Gap(gap).
 							Justify(ui.Start).Children(func() {
-							for _, s := range a.services {
-								a.serviceCard(c, s)
+							for i, s := range a.services {
+								a.serviceCard(c, i, s)
 							}
 						})
 					})
@@ -870,7 +885,7 @@ func (a *app) pickExecutable() {
 
 // serviceCard draws a service as a card in the grid, with its first
 // letter as a badge, its status under its name, and its actions below.
-func (a *app) serviceCard(c *ui.Context, s service) {
+func (a *app) serviceCard(c *ui.Context, i int, s service) {
 	t := c.Theme()
 	busy := a.busy[s.name]
 	status := s.status
@@ -901,9 +916,10 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 	card.Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Gap(10).Children(func() {
 			initial := strings.ToUpper(string([]rune(s.name)[0]))
+			tint := avatarColor(i)
 			ui.Box(c).Width(34).Height(34).Radius(9).Center().
-				Background(t.Accent.Alpha(0.12)).Children(func() {
-				ui.Text(c, initial).FontSize(16).Bold().TextColor(t.Accent)
+				Background(tint.Alpha(0.16)).Children(func() {
+				ui.Text(c, initial).FontSize(16).Bold().TextColor(tint)
 			})
 			ui.Column(c).Gap(2).Children(func() {
 				ui.Text(c, s.name).Bold().SingleLine()

@@ -525,3 +525,17 @@ func TestMoreMenuClosesOnEscape(t *testing.T) {
 		t.Fatal("Escape did not close the menu")
 	}
 }
+
+func TestAvatarColor(t *testing.T) {
+	seen := map[ui.Color]bool{}
+	for i := range avatarColors {
+		c := avatarColor(i)
+		if seen[c] {
+			t.Errorf("color %v repeats at index %d", c, i)
+		}
+		seen[c] = true
+	}
+	if avatarColor(len(avatarColors)) != avatarColor(0) {
+		t.Error("the colors do not cycle")
+	}
+}
