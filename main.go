@@ -56,6 +56,14 @@ var (
 	moreIcon    = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>`))
 )
 
+// The rows of the More menu.
+var (
+	editIcon      = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l4 4M4 20l1-4.5L16.5 4a2.1 2.1 0 0 1 3 3L8 18.5z"/></svg>`))
+	restartIcon   = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`))
+	uninstallIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-9M8 15l4-4 4 4M5 4h14"/></svg>`))
+	trashIcon     = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`))
+)
+
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
 type service struct {
@@ -85,6 +93,8 @@ type app struct {
 
 	dialog        dialogMode // the dialog that shows, none when closed
 	editDir       string     // the directory of the service being edited
+	moreName      string     // the service whose More menu is open
+	moreOpen      bool       // the More menu shows
 	deleting      string     // the service asked about for deletion
 	confirmDelete bool       // the delete alert shows
 	dlgOpen       bool       // DialogBase's open flag
@@ -941,26 +951,70 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 			}
 		}
 		editable := serviceConfig(a.dir, s.name) != ""
-		actionButton(c, false, moreIcon, locales.More()).
-			Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy).
-			Menu(func(m *ui.Menu) {
-				if m.Item(locales.Edit()).Disabled(busy || !editable).Chosen() {
+		more := actionButton(c, false, moreIcon, locales.More()).
+			Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy)
+		if more.Clicked() {
+			a.moreName, a.moreOpen = s.name, !a.moreOpen
+		}
+		if a.moreName == s.name && a.moreOpen {
+			ui.PopoverBase(c, more, &a.moreOpen, func(panel ui.Element) {
+				panel.Padding(6).Radius(14).MinWidth(170).
+					Material(glass.Glass{})
+				if menuItem(c, editIcon, locales.Edit(), !busy && editable) {
+					a.closeMore()
 					a.openEditDialog(s.name)
 				}
-				m.Separator()
-				if m.Item(locales.Restart()).Disabled(busy || !installed).Chosen() {
+				menuSeparator(c)
+				if menuItem(c, restartIcon, locales.Restart(), !busy && installed) {
+					a.closeMore()
 					a.run(s.name, "restart")
 				}
-				if m.Item(locales.Uninstall()).Disabled(busy || s.status != statusStopped).Chosen() {
+				if menuItem(c, uninstallIcon, locales.Uninstall(), !busy && s.status == statusStopped) {
+					a.closeMore()
 					a.run(s.name, "uninstall")
 				}
-				m.Separator()
-				if m.Item(locales.Delete()).Disabled(busy || installed).Chosen() {
+				menuSeparator(c)
+				if menuItem(c, trashIcon, locales.Delete(), !busy && !installed) {
+					a.closeMore()
 					a.deleting = s.name
 					a.confirmDelete = true
 				}
 			})
+		}
 	})
+}
+
+// closeMore closes the More menu.
+func (a *app) closeMore() {
+	a.moreOpen = false
+	a.moreName = ""
+}
+
+// menuItem draws a row of the More menu, which it reports a click of. A
+// row that is disabled is muted and takes no click.
+func menuItem(c *ui.Context, icon *ui.SVG, label string, enabled bool) bool {
+	t := c.Theme()
+	row := ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(7, 10).Radius(9).
+		Label(label)
+	fg := t.Text
+	if enabled {
+		row.Cursor(ui.CursorPointer)
+		if row.Hovered() {
+			row.Background(t.Accent.Alpha(0.16))
+		}
+	} else {
+		fg = t.TextMuted.Alpha(0.7)
+	}
+	row.Children(func() {
+		ui.Icon(c, icon).FontSize(14).TextColor(fg)
+		ui.Text(c, label).FontSize(13).TextColor(fg).SingleLine()
+	})
+	return enabled && row.Clicked()
+}
+
+// menuSeparator draws a hairline between groups of rows.
+func menuSeparator(c *ui.Context) {
+	ui.Box(c).Height(1).Margin(4, 8).Background(c.Theme().Border.Alpha(0.7))
 }
 
 func main() {

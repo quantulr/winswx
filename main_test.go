@@ -450,7 +450,7 @@ func TestDeleteServiceFromMenu(t *testing.T) {
 	if err := tt.Click(locales.More()); err != nil {
 		t.Fatal(err)
 	}
-	if err := tt.ChooseMenuItem(locales.Delete()); err != nil {
+	if err := tt.Click(locales.Delete()); err != nil {
 		t.Fatal(err)
 	}
 	if !a.confirmDelete {
