@@ -42,7 +42,7 @@ jobs:
               --draft --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
           fi
           shopt -s nullglob
-          files=(build/windows-amd64/*.zip build/windows-amd64/*Setup*.exe)
+          files=(build/windows-amd64/*.zip build/windows-amd64/*[Ss]etup*.exe)
           if [ ${#files[@]} -eq 0 ]; then
             echo "no installer or archive in build/windows-amd64" >&2
             exit 1
