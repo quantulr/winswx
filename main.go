@@ -48,6 +48,14 @@ var plusIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" v
 // shows it.
 var languageIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>`))
 
+// The actions of a card, drawn in the text color of their buttons.
+var (
+	playIcon    = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6.2v11.6a1 1 0 0 0 1.52.85l9.3-5.8a1 1 0 0 0 0-1.7l-9.3-5.8A1 1 0 0 0 9 6.2z"/></svg>`))
+	stopIcon    = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>`))
+	installIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>`))
+	moreIcon    = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18" cy="12" r="1.7"/></svg>`))
+)
+
 // service is a directory in the services directory, and the status of the
 // Windows service named after it.
 type service struct {
@@ -898,49 +906,60 @@ func (a *app) serviceCard(c *ui.Context, s service) {
 }
 
 // serviceButtons shows the actions of a service, by its status.
+// actionButton is a button with an icon before its label.
+func actionButton(c *ui.Context, primary bool, icon *ui.SVG, label string) ui.Element {
+	var b ui.Element
+	if primary {
+		b = ui.PrimaryButton(c, "")
+	} else {
+		b = ui.Button(c, "")
+	}
+	return b.Label(label).Gap(4).Children(func() {
+		ui.Icon(c, icon).FontSize(14)
+		ui.Text(c, label).SingleLine()
+	})
+}
+
 func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 	installed := s.status == statusRunning || s.status == statusStopped ||
 		s.status == statusStarting || s.status == statusStopping || s.status == statusPaused
 	ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 		label, command := "", ""
+		var icon *ui.SVG
 		switch s.status {
 		case statusRunning, statusPaused, statusStarting:
-			label, command = locales.Stop(), "stop"
+			label, command, icon = locales.Stop(), "stop", stopIcon
 		case statusStopped:
-			label, command = locales.Start(), "start"
+			label, command, icon = locales.Start(), "start", playIcon
 		case statusNotInstalled:
-			label, command = locales.Install(), "install"
+			label, command, icon = locales.Install(), "install", installIcon
 		}
 		if label != "" {
-			var b ui.Element
-			if command == "stop" {
-				b = ui.Button(c, label)
-			} else {
-				b = ui.PrimaryButton(c, label)
-			}
+			b := actionButton(c, command != "stop", icon, label)
 			if b.Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy).Clicked() {
 				a.run(s.name, command)
 			}
 		}
 		editable := serviceConfig(a.dir, s.name) != ""
-		ui.Button(c, locales.More()).Padding(3, 7).Cursor(ui.CursorPointer).
-			Disabled(busy).Menu(func(m *ui.Menu) {
-			if m.Item(locales.Edit()).Disabled(busy || !editable).Chosen() {
-				a.openEditDialog(s.name)
-			}
-			m.Separator()
-			if m.Item(locales.Restart()).Disabled(busy || !installed).Chosen() {
-				a.run(s.name, "restart")
-			}
-			if m.Item(locales.Uninstall()).Disabled(busy || s.status != statusStopped).Chosen() {
-				a.run(s.name, "uninstall")
-			}
-			m.Separator()
-			if m.Item(locales.Delete()).Disabled(busy || installed).Chosen() {
-				a.deleting = s.name
-				a.confirmDelete = true
-			}
-		})
+		actionButton(c, false, moreIcon, locales.More()).
+			Padding(3, 7).Cursor(ui.CursorPointer).Disabled(busy).
+			Menu(func(m *ui.Menu) {
+				if m.Item(locales.Edit()).Disabled(busy || !editable).Chosen() {
+					a.openEditDialog(s.name)
+				}
+				m.Separator()
+				if m.Item(locales.Restart()).Disabled(busy || !installed).Chosen() {
+					a.run(s.name, "restart")
+				}
+				if m.Item(locales.Uninstall()).Disabled(busy || s.status != statusStopped).Chosen() {
+					a.run(s.name, "uninstall")
+				}
+				m.Separator()
+				if m.Item(locales.Delete()).Disabled(busy || installed).Chosen() {
+					a.deleting = s.name
+					a.confirmDelete = true
+				}
+			})
 	})
 }
 
