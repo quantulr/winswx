@@ -8,6 +8,8 @@ configuration.
 The app shows in English or Chinese, following the system language; the
 globe button in the title bar switches between them.
 
+[中文说明](README.zh-Hans.md)
+
 ## Build
 
 The WinSW executable the app ships is not in the repository: `.gitignore`
@@ -40,11 +42,18 @@ The app keeps its data in `%AppData%\winswx`:
 
 ```
 %AppData%\winswx\
+├── bin\
+│   └── winsw.exe          the wrapper services are installed from
 └── services\
     └── <name>\
         ├── <name>.xml    the WinSW configuration
         └── *.log         the service's logs
 ```
+
+Services run from `bin\winsw.exe` in the user data directory, not from the
+app's own files, so a running service does not keep the app from being
+updated or uninstalled. Services installed by earlier versions registered
+the app's own copy; reinstall them once to move them over.
 
 Installing, starting and stopping services needs administrator rights; run
 the app elevated for those operations.

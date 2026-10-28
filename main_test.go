@@ -539,3 +539,34 @@ func TestAvatarColor(t *testing.T) {
 		t.Error("the colors do not cycle")
 	}
 }
+
+func TestServiceWinsw(t *testing.T) {
+	userData := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, userData)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	bundled := filepath.Join(t.TempDir(), "winsw.exe")
+	if err := os.WriteFile(bundled, []byte("wrapper"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{winsw: bundled}
+	got, err := a.serviceWinsw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(userData, "bin", "winsw.exe")
+	if got != want {
+		t.Fatalf("serviceWinsw = %q, want %q", got, want)
+	}
+	if data, err := os.ReadFile(got); err != nil || string(data) != "wrapper" {
+		t.Fatalf("copied wrapper = %q, %v", data, err)
+	}
+
+	// Once copied, the bundled file may go: services keep their wrapper.
+	if err := os.Remove(bundled); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := a.serviceWinsw(); err != nil || again != got {
+		t.Fatalf("serviceWinsw again = %q, %v", again, err)
+	}
+}

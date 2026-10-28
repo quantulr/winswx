@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -432,6 +433,50 @@ func (a *app) refreshStatuses() {
 // run executes a WinSW command on a service in the background, then
 // reloads the services to show the result. WinSW installs and starts
 // services with the rights of the app, which needs to be elevated.
+// serviceWinsw returns the WinSW executable services are installed and
+// run from. It lives in the user data directory, apart from the app's own
+// files, so that a running service does not lock what an update replaces.
+func (a *app) serviceWinsw() (string, error) {
+	userData, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return "", err
+	}
+	dest := filepath.Join(userData, "bin", "winsw.exe")
+	if _, err := os.Stat(dest); err == nil {
+		return dest, nil
+	}
+	if a.winsw == "" {
+		return "", errors.New("the bundled winsw.exe is missing")
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return "", err
+	}
+	src, err := os.Open(a.winsw)
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	tmp := dest + ".download"
+	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(out, src); err != nil {
+		_ = out.Close()
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	return dest, nil
+}
+
 func (a *app) run(name, command string) {
 	if a.win == nil || a.winsw == "" || a.busy[name] {
 		return
@@ -441,12 +486,17 @@ func (a *app) run(name, command string) {
 		a.opErr = name + ": " + locales.ErrNoConfig()
 		return
 	}
+	winsw, err := a.serviceWinsw()
+	if err != nil {
+		a.opErr = err.Error()
+		return
+	}
 	if a.busy == nil {
 		a.busy = make(map[string]bool)
 	}
 	a.busy[name] = true
 	a.opErr = ""
-	winsw, win := a.winsw, a.win
+	win := a.win
 	win.Update(func() {}) // redraw with the service busy
 	go func() {
 		cmd := exec.Command(winsw, command, config)
