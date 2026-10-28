@@ -1074,7 +1074,17 @@ func menuSeparator(c *ui.Context) {
 }
 
 func main() {
+	// One window: starting the app again brings the running one forward.
+	if !mygo.App.RequestSingleInstanceLock() {
+		return
+	}
 	a := &app{}
+	mygo.App.OnSecondInstance(func([]string, string) {
+		if a.win != nil {
+			a.win.Restore()
+			a.win.Focus()
+		}
+	})
 	a.load()
 	mygo.App.WhenReady(func() {
 		win := mygo.NewWindow(mygo.WindowOptions{
