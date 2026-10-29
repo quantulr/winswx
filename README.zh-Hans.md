@@ -35,6 +35,15 @@ go tool mygo build
 go test ./...
 ```
 
+## 更新
+
+安装后的应用会从 GitHub 上带签名的 Release 自动更新：启动 10 秒后检查一次，
+之后每天检查一次，发现新版本时提示安装。`mygo build` 使用仓库 secret
+`MYGO_UPDATER_PRIVATE_KEY` 中的私钥为更新签名，它必须与 `mygo.json` 里的
+`updates.publicKey` 配对。请妥善保管该私钥——已安装的应用只会接受用它对
+应的密钥签名的更新。在该功能出现之前安装的版本，需要手动安装一次包含它的
+版本。
+
 ## 数据
 
 应用数据保存在 `%AppData%\winswx`：

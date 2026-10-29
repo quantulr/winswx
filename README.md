@@ -36,6 +36,16 @@ Tests:
 go test ./...
 ```
 
+## Updates
+
+Installed apps update themselves from the signed releases on GitHub: they
+check ten seconds after launch, then once a day, and offer to install a
+newer version. `mygo build` signs the update with the key in the
+`MYGO_UPDATER_PRIVATE_KEY` secret of the repository, which must match
+`updates.publicKey` in `mygo.json`. Keep that key: installed apps accept
+only updates signed with it. Apps installed before the feature existed
+need one manual install of a version that has it.
+
 ## Data
 
 The app keeps its data in `%AppData%\winswx`:

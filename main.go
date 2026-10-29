@@ -18,6 +18,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/plugins/glass"
+	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 
 	"mygo/locales"
@@ -1128,6 +1129,8 @@ func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
+	// Check the signed releases for a newer version and install it.
+	mygo.Use(native.Plugin)
 	a := &app{}
 	mygo.App.OnSecondInstance(func([]string, string) {
 		if a.win != nil {

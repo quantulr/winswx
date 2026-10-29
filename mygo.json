@@ -3,5 +3,9 @@
   "identifier": "com.quantulr.winswx",
   "version": "1.0.6",
   "out": "build",
-  "i18n": { "dir": "locales", "source": "en" }
+  "i18n": { "dir": "locales", "source": "en" },
+  "updates": {
+    "publicKey": "ETi3lvNgWt5I7tTNNU22W/qe0Vv9Lxlao+/CSb/grRY=",
+    "github": "quantulr/winswx"
+  }
 }
