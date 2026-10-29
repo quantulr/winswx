@@ -43,5 +43,11 @@
   "errNameReserved": "The service name is reserved on Windows.",
   "errExecutable": "The executable is required.",
   "errServicesDir": "The services directory is not available.",
-  "errNoConfig": "This service has no WinSW configuration file."
+  "errNoConfig": "This service has no WinSW configuration file.",
+  "viewLogs": "View Logs…",
+  "logs": "Logs",
+  "noLogs": "No log files yet.",
+  "logsEmpty": "(empty)",
+  "logsTruncated": "Showing the last 64 KB.",
+  "close": "Close"
 }

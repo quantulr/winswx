@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,6 +65,7 @@ var (
 	restartIcon   = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`))
 	uninstallIcon = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-9M8 15l4-4 4 4M5 4h14"/></svg>`))
 	trashIcon     = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`))
+	logsIcon      = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></svg>`))
 )
 
 // avatarColors are the colors a service's badge picks from, by its name.
@@ -116,13 +118,22 @@ type app struct {
 	moreFresh     bool       // seed the opening animation
 	deleting      string     // the service asked about for deletion
 	confirmDelete bool       // the delete alert shows
-	dlgOpen       bool       // DialogBase's open flag
-	dlgTarget     float32    // 1 shown, 0 closing
-	dlgFresh      bool       // seed the opening animation
-	newName       string     // the name in the dialog
-	newExe        string     // the executable in the dialog
-	newArgs       string     // the arguments in the dialog
-	dlgErr        string     // why the dialog could not be saved
+	logsDir       string     // the service whose logs the dialog shows
+	logsOptions   []string   // the log files the segmented control offers
+	logsExisting  []bool     // whether each option's file exists
+	logsFile      string     // the log file shown
+	logsText      string     // its tail
+	logsTrunc     bool       // the tail is not the whole file
+	logsErr       string     // why the logs could not be read
+	logsTab       int        // the log chosen in the segmented control
+	logsScroll    ui.ScrollState
+	dlgOpen       bool    // DialogBase's open flag
+	dlgTarget     float32 // 1 shown, 0 closing
+	dlgFresh      bool    // seed the opening animation
+	newName       string  // the name in the dialog
+	newExe        string  // the executable in the dialog
+	newArgs       string  // the arguments in the dialog
+	dlgErr        string  // why the dialog could not be saved
 }
 
 // dialogMode names the form the dialog shows.
@@ -133,6 +144,7 @@ const (
 	dialogNone dialogMode = iota
 	dialogAdd
 	dialogEdit
+	dialogLogs
 )
 
 // winswExe returns the path of the WinSW executable that ships with the
@@ -671,46 +683,51 @@ func (a *app) dialogView(c *ui.Context) {
 			MaxWidth(winW-t.Space(10)).MaxHeight(winH-t.Space(10)).
 			Shadow(0, 10*p, 30*p, 0, ui.RGBA(0, 0, 0, 0.3*p)).
 			Scale(0.96+0.04*p, 0.96+0.04*p).Opacity(p)
-		title, action := locales.AddService(), locales.Add()
-		if a.dialog == dialogEdit {
-			title, action = locales.EditService(), locales.Save()
-		}
-		ui.Text(c, title).FontSize(18).Bold()
-		name := ui.TextInput(c, &a.newName).Placeholder(locales.ServiceName()).
-			Label("Name").AutoFocus().Width(w)
-		if a.dialog == dialogEdit {
-			name.Disabled(true).Tooltip(locales.ServiceIDReadOnly())
-		}
-		var exe ui.Element
-		ui.Row(c).Gap(8).Width(w).Children(func() {
-			exe = ui.TextInput(c, &a.newExe).Placeholder(`C:\path\to\service.exe`).
-				Label("Executable").Grow(1)
-			if ui.Button(c, locales.Browse()).Cursor(ui.CursorPointer).Clicked() {
-				a.pickExecutable()
+		if a.dialog == dialogLogs {
+			lw := min(800, max(320, winW-80))
+			a.logsForm(c, lw, winH)
+		} else {
+			title, action := locales.AddService(), locales.Add()
+			if a.dialog == dialogEdit {
+				title, action = locales.EditService(), locales.Save()
 			}
-		})
-		args := ui.TextInput(c, &a.newArgs).Placeholder(locales.ArgumentsOptional()).
-			Label("Arguments").Width(w)
-		if a.dlgErr != "" {
-			ui.Text(c, a.dlgErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
-		}
-		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-			if ui.Button(c, locales.Cancel()).Clicked() {
-				a.closeDialog(c)
+			ui.Text(c, title).FontSize(18).Bold()
+			name := ui.TextInput(c, &a.newName).Placeholder(locales.ServiceName()).
+				Label("Name").AutoFocus().Width(w)
+			if a.dialog == dialogEdit {
+				name.Disabled(true).Tooltip(locales.ServiceIDReadOnly())
 			}
-			if ui.PrimaryButton(c, action).Clicked() ||
-				name.Submitted() || exe.Submitted() || args.Submitted() {
-				saved := false
-				if a.dialog == dialogEdit {
-					saved = a.saveService()
-				} else {
-					saved = a.addService()
+			var exe ui.Element
+			ui.Row(c).Gap(8).Width(w).Children(func() {
+				exe = ui.TextInput(c, &a.newExe).Placeholder(`C:\path\to\service.exe`).
+					Label("Executable").Grow(1)
+				if ui.Button(c, locales.Browse()).Cursor(ui.CursorPointer).Clicked() {
+					a.pickExecutable()
 				}
-				if saved {
+			})
+			args := ui.TextInput(c, &a.newArgs).Placeholder(locales.ArgumentsOptional()).
+				Label("Arguments").Width(w)
+			if a.dlgErr != "" {
+				ui.Text(c, a.dlgErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
+			}
+			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
+				if ui.Button(c, locales.Cancel()).Clicked() {
 					a.closeDialog(c)
 				}
-			}
-		})
+				if ui.PrimaryButton(c, action).Clicked() ||
+					name.Submitted() || exe.Submitted() || args.Submitted() {
+					saved := false
+					if a.dialog == dialogEdit {
+						saved = a.saveService()
+					} else {
+						saved = a.addService()
+					}
+					if saved {
+						a.closeDialog(c)
+					}
+				}
+			})
+		}
 		// Faded away: take the dialog out of the tree.
 		if a.dlgTarget == 0 && p < 0.01 {
 			a.dialog = dialogNone
@@ -773,6 +790,233 @@ func (a *app) closeDialog(c *ui.Context) {
 	a.dlgOpen = true
 	a.dlgTarget = 0
 	c.Invalidate()
+}
+
+// openLogsDialog shows the log files of a service.
+func (a *app) openLogsDialog(name string) {
+	a.logsDir = filepath.Join(a.dir, name)
+	a.logsOptions = nil
+	a.logsExisting = nil
+	a.logsFile = ""
+	a.logsTab = 0
+	a.logsText, a.logsTrunc, a.logsErr = "", false, ""
+	a.dialog = dialogLogs
+	a.dlgOpen = true
+	a.dlgTarget = 0
+	a.dlgFresh = true
+	a.dlgErr = ""
+	a.reloadLogs()
+}
+
+// reloadLogs lists the log files in the service's directory and reads the
+// tail of the selected one.
+func (a *app) reloadLogs() {
+	a.logsOptions = a.logsOptions[:0]
+	a.logsExisting = a.logsExisting[:0]
+	a.logsText, a.logsTrunc, a.logsErr = "", false, ""
+	entries, err := os.ReadDir(a.logsDir)
+	if err != nil {
+		a.logsErr = err.Error()
+		return
+	}
+	base := filepath.Base(a.logsDir)
+	standard := []string{base + ".wrapper.log", base + ".out.log", base + ".err.log"}
+	existing := make(map[string]bool, len(entries))
+	var extra []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".log") {
+			continue
+		}
+		name := entry.Name()
+		existing[name] = true
+		if name != standard[0] && name != standard[1] && name != standard[2] {
+			extra = append(extra, name)
+		}
+	}
+	a.logsOptions = append(a.logsOptions, standard...)
+	a.logsOptions = append(a.logsOptions, extra...)
+	for _, name := range a.logsOptions {
+		a.logsExisting = append(a.logsExisting, existing[name])
+	}
+
+	// Keep the chosen log while it exists; else show the wrapper log,
+	// else the first that exists.
+	a.logsTab = 0
+	kept := false
+	for i, name := range a.logsOptions {
+		if name == a.logsFile && a.logsExisting[i] {
+			a.logsTab, kept = i, true
+			break
+		}
+	}
+	if !kept {
+		a.logsFile = ""
+		for i, name := range a.logsOptions {
+			if a.logsExisting[i] && strings.HasSuffix(name, ".wrapper.log") {
+				a.logsFile, a.logsTab = name, i
+				break
+			}
+		}
+		if a.logsFile == "" {
+			for i, name := range a.logsOptions {
+				if a.logsExisting[i] {
+					a.logsFile, a.logsTab = name, i
+					break
+				}
+			}
+		}
+	}
+	if a.logsFile == "" {
+		return
+	}
+	text, trunc, err := readLogTail(filepath.Join(a.logsDir, a.logsFile), 64<<10)
+	if err != nil {
+		a.logsErr = err.Error()
+		return
+	}
+	a.logsText, a.logsTrunc = text, trunc
+	a.logsScroll.X, a.logsScroll.Y = 0, math.MaxFloat32 // show the newest lines
+}
+
+// logLabel names a log file without its service's prefix.
+func (a *app) logLabel(name string) string {
+	base := filepath.Base(a.logsDir)
+	if rest, ok := strings.CutPrefix(name, base+"."); ok {
+		return rest
+	}
+	return name
+}
+
+// readLogTail returns the last size bytes of path, dropping the partial
+// line at the cut, and reports whether anything was left out.
+func readLogTail(path string, size int64) (string, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "", false, err
+	}
+	off := info.Size() - size
+	if off < 0 {
+		off = 0
+	}
+	if _, err := f.Seek(off, io.SeekStart); err != nil {
+		return "", false, err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", false, err
+	}
+	s := string(data)
+	if off > 0 {
+		if i := strings.IndexByte(s, '\n'); i >= 0 {
+			s = s[i+1:]
+		}
+	}
+	return strings.ToValidUTF8(s, "�"), off > 0, nil
+}
+
+// logsForm shows the log files of a service and the tail of the selected
+// one, which Refresh reads again.
+func (a *app) logsForm(c *ui.Context, w, winH float32) {
+	t := c.Theme()
+	ui.Row(c).AlignItems(ui.Center).Gap(8).Width(w).Children(func() {
+		ui.Text(c, locales.Logs()).FontSize(18).Bold()
+		ui.Text(c, filepath.Base(a.logsDir)).TextColor(t.TextMuted)
+		ui.Spacer(c).Grow(1)
+		if ui.Button(c, locales.Refresh()).FontSize(12).Padding(3, 7).
+			Cursor(ui.CursorPointer).Clicked() {
+			a.reloadLogs()
+		}
+	})
+	hasLogs := false
+	for _, exists := range a.logsExisting {
+		if exists {
+			hasLogs = true
+			break
+		}
+	}
+	if hasLogs {
+		labels := make([]string, len(a.logsOptions))
+		for i, name := range a.logsOptions {
+			labels[i] = a.logLabel(name)
+		}
+		ui.Row(c).Width(w).Justify(ui.Center).Children(func() {
+			edge := t.Text.Alpha(0.14)
+			if t.Dark {
+				edge = t.Text.Alpha(0.20)
+			}
+			seg := ui.SegmentedBase(c, &a.logsTab, len(labels))
+			seg.Track.Padding(3).Radius(10).Border(1, edge).
+				Shadow(0, 2, 10, 0, ui.RGBA(0, 0, 0, 0.16)).
+				Label(locales.Logs()).Material(glass.Glass{}).
+				Children(func() {
+					for i, label := range labels {
+						s := seg.Segment(i).Padding(4, 12).Radius(7).
+							Label(label)
+						if !a.logsExisting[i] {
+							s.Disabled(true).TextColor(t.TextMuted.Alpha(0.55))
+						} else {
+							s.Cursor(ui.CursorPointer)
+							if i == a.logsTab && a.logsOptions[i] == a.logsFile {
+								s.Background(t.Accent).TextColor(t.AccentText)
+							} else {
+								s.TextColor(t.Text)
+								if s.Hovered() {
+									s.Background(t.Text.Alpha(0.07))
+								}
+							}
+						}
+						s.Children(func() { ui.Text(c, label).SingleLine() })
+					}
+				})
+		})
+		// The control writes the chosen index.
+		if a.logsTab >= 0 && a.logsTab < len(a.logsOptions) {
+			name := a.logsOptions[a.logsTab]
+			if a.logsExisting[a.logsTab] && name != a.logsFile {
+				a.logsFile = name
+				a.reloadLogs()
+			}
+		}
+	}
+	// The log area and its note keep their room whatever the chosen file
+	// holds, so that switching logs does not resize the dialog.
+	height := max(80, winH-250)
+	switch {
+	case a.logsErr != "":
+		ui.Text(c, a.logsErr).FontSize(12).TextColor(t.Danger).Wrap().Width(w)
+	case a.logsFile == "":
+		ui.Text(c, locales.NoLogs()).TextColor(t.TextMuted).Width(w)
+	default:
+		ui.ScrollBoth(c).Width(w).Height(height).Padding(8).Radius(8).
+			TrackScroll(&a.logsScroll).
+			Background(t.Surface).Border(1, t.Border).Children(func() {
+			if a.logsText == "" {
+				ui.Text(c, locales.LogsEmpty()).TextColor(t.TextMuted)
+				return
+			}
+			ui.Text(c, a.logsText).Font("Consolas").FontSize(12).
+				LineHeight(1.3).NoWrap().Selectable()
+		})
+		note := ""
+		if a.logsTrunc {
+			note = locales.LogsTruncated()
+		}
+		ui.Row(c).Height(16).Width(w).Children(func() {
+			if note != "" {
+				ui.Text(c, note).FontSize(12).TextColor(t.TextMuted)
+			}
+		})
+	}
+	ui.Row(c).Gap(8).Justify(ui.End).Width(w).Children(func() {
+		if ui.Button(c, locales.Close()).Clicked() {
+			a.closeDialog(c)
+		}
+	})
 }
 
 // deleteAlert asks before removing a service and its files.
@@ -1056,6 +1300,10 @@ func (a *app) serviceButtons(c *ui.Context, s service, busy bool) {
 					a.closeMore(c)
 					a.openEditDialog(s.name)
 				}
+				if menuItem(c, logsIcon, locales.ViewLogs(), !busy) {
+					a.closeMore(c)
+					a.openLogsDialog(s.name)
+				}
 				menuSeparator(c)
 				if menuItem(c, restartIcon, locales.Restart(), !busy && installed) {
 					a.closeMore(c)
@@ -1143,8 +1391,8 @@ func main() {
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title:         "winswx",
 			TitleBarStyle: mygo.TitleBarHidden,
-			Width:         480,
-			Height:        360,
+			Width:         640,
+			Height:        480,
 			MinWidth:      320,
 			MinHeight:     280,
 			// Opens where the user left it last time.

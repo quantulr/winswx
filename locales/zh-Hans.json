@@ -43,5 +43,11 @@
   "errNameReserved": "该名称是 Windows 保留名称。",
   "errExecutable": "必须提供可执行文件。",
   "errServicesDir": "服务目录不可用。",
-  "errNoConfig": "该服务没有 WinSW 配置文件。"
+  "errNoConfig": "该服务没有 WinSW 配置文件。",
+  "viewLogs": "查看日志…",
+  "logs": "日志",
+  "noLogs": "还没有日志文件。",
+  "logsEmpty": "（空）",
+  "logsTruncated": "仅显示最近 64 KB。",
+  "close": "关闭"
 }

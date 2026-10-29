@@ -473,3 +473,63 @@ func ErrNoConfig() string { return In(i18n.Locale()).ErrNoConfig() }
 func (msgs Messages) ErrNoConfig() string {
 	return Catalog.Format(msgs.locale, "errNoConfig", nil)
 }
+
+// ViewLogs says "View Logs…"
+// in the language the app shows.
+func ViewLogs() string { return In(i18n.Locale()).ViewLogs() }
+
+// ViewLogs says "View Logs…"
+// in the language of msgs.
+func (msgs Messages) ViewLogs() string {
+	return Catalog.Format(msgs.locale, "viewLogs", nil)
+}
+
+// Logs says "Logs"
+// in the language the app shows.
+func Logs() string { return In(i18n.Locale()).Logs() }
+
+// Logs says "Logs"
+// in the language of msgs.
+func (msgs Messages) Logs() string {
+	return Catalog.Format(msgs.locale, "logs", nil)
+}
+
+// NoLogs says "No log files yet."
+// in the language the app shows.
+func NoLogs() string { return In(i18n.Locale()).NoLogs() }
+
+// NoLogs says "No log files yet."
+// in the language of msgs.
+func (msgs Messages) NoLogs() string {
+	return Catalog.Format(msgs.locale, "noLogs", nil)
+}
+
+// LogsEmpty says "(empty)"
+// in the language the app shows.
+func LogsEmpty() string { return In(i18n.Locale()).LogsEmpty() }
+
+// LogsEmpty says "(empty)"
+// in the language of msgs.
+func (msgs Messages) LogsEmpty() string {
+	return Catalog.Format(msgs.locale, "logsEmpty", nil)
+}
+
+// LogsTruncated says "Showing the last 64 KB."
+// in the language the app shows.
+func LogsTruncated() string { return In(i18n.Locale()).LogsTruncated() }
+
+// LogsTruncated says "Showing the last 64 KB."
+// in the language of msgs.
+func (msgs Messages) LogsTruncated() string {
+	return Catalog.Format(msgs.locale, "logsTruncated", nil)
+}
+
+// Close says "Close"
+// in the language the app shows.
+func Close() string { return In(i18n.Locale()).Close() }
+
+// Close says "Close"
+// in the language of msgs.
+func (msgs Messages) Close() string {
+	return Catalog.Format(msgs.locale, "close", nil)
+}
