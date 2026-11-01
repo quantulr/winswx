@@ -8,6 +8,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,7 +21,7 @@ import (
 const (
 	url     = "https://github.com/winsw/winsw/releases/download/v3.0.0-alpha.11/WinSW-x64.exe"
 	sum     = "a2daa6a33a9c2b791ae31d9092e7935c339d1e03e89bfb747618ce2f4e819e20"
-	dest    = "resources/bin/winsw.exe"
+	relDest = "resources/bin/winsw.exe"
 	version = "WinSW v3.0.0-alpha.11"
 )
 
@@ -32,6 +33,11 @@ func main() {
 }
 
 func fetch() error {
+	root, err := findRoot()
+	if err != nil {
+		return err
+	}
+	dest := filepath.Join(root, relDest)
 	if data, err := os.ReadFile(dest); err == nil {
 		if sum256(data) == sum {
 			fmt.Println(dest, "is up to date")
@@ -69,6 +75,25 @@ func fetch() error {
 	}
 	fmt.Println("Saved", dest)
 	return nil
+}
+
+// findRoot returns the project directory that holds mygo.json, starting at
+// the working directory and walking up.
+func findRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "mygo.json")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", errors.New("mygo.json not found above the working directory")
+		}
+		dir = parent
+	}
 }
 
 func sum256(data []byte) string {

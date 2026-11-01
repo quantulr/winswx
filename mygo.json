@@ -2,8 +2,9 @@
   "name": "winswx",
   "identifier": "com.quantulr.winswx",
   "version": "1.0.8",
+  "main": "./cmd/winswx",
   "out": "build",
-  "i18n": { "dir": "locales", "source": "en" },
+  "i18n": { "dir": "internal/locales", "source": "en" },
   "updates": {
     "publicKey": "ETi3lvNgWt5I7tTNNU22W/qe0Vv9Lxlao+/CSb/grRY=",
     "github": "quantulr/winswx"
