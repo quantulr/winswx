@@ -1,7 +1,7 @@
 {
   "name": "winswx",
   "identifier": "com.quantulr.winswx",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "main": "./cmd/winswx",
   "out": "build",
   "i18n": { "dir": "internal/locales", "source": "en" },
