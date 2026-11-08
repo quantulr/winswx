@@ -44,7 +44,10 @@ newer version. `mygo build` signs the update with the key in the
 `MYGO_UPDATER_PRIVATE_KEY` secret of the repository, which must match
 `updates.publicKey` in `mygo.json`. Keep that key: installed apps accept
 only updates signed with it. Apps installed before the feature existed
-need one manual install of a version that has it.
+need one manual install of a version that has it. The update window and
+its release notes follow the app's language: the notes are the section of
+the version in `CHANGELOG.md`, under `### 中文` or `### English`. Add the
+version's `## <version>` section before releasing.
 
 ## Data
 
