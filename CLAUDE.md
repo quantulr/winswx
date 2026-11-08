@@ -57,7 +57,7 @@ go tool mygo i18n check
 
 - `.github/workflows/ci.yml`：push/PR 在 windows-latest 上拉取 WinSW，运行 `go vet ./...` 和 `go test ./...`。
 - `.github/workflows/release.yml`：推送 `v*` tag 时创建 draft release，并用 `go tool mygo build -platform windows/amd64 -upload` 构建、签名和上传；手动触发只构建未签名 artifact。
-- 先改 `mygo.json` 的 `version`，并在 `CHANGELOG.md` 中添加该版本的 `## <version>` 小节，其中用 `### 中文` 和 `### English` 分语言；更新窗口会显示当前语言的小节。缺少版本小节时签名构建会失败。再提交、打 tag（`vX.Y.Z`）并推送。
+- 先改 `mygo.json` 的 `version`，并在 `CHANGELOG.md` 中添加该版本的 `## <version>` 小节，其中用 `### 中文` 和 `### English` 分语言；更新窗口会显示当前语言的小节。更新日志只写用户能感知的更改，重构、依赖升级等内部改动不要写入。缺少版本小节时签名构建会失败。再提交、打 tag（`vX.Y.Z`）并推送。
 - 更新签名私钥保存在仓库 secret `MYGO_UPDATER_PRIVATE_KEY` 中，必须与 `mygo.json` 的 `updates.publicKey` 配对；私钥不要提交。仓库 secret 由用户设置。
 - 工作流成功后发布 draft：`gh release edit vX.Y.Z --draft=false`。
 - 更新源为 `https://github.com/quantulr/winswx/releases/latest/download/update-windows-amd64.json`。
