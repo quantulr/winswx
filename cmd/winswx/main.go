@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/plugins/updater/native"
 
 	"mygo/internal/app"
@@ -17,8 +18,9 @@ func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
-	// Check the signed releases for a newer version and install it.
-	mygo.Use(native.Plugin)
+	// Check the signed releases for a newer version and install it. The
+	// update window speaks Chinese, whatever language the app shows.
+	mygo.Use(native.New(updater.Options{Language: "zh-Hans"}))
 	a := app.New()
 	mygo.App.OnSecondInstance(func([]string, string) { a.Focus() })
 	mygo.App.WhenReady(a.OpenWindow)
