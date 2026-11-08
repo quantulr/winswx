@@ -17,9 +17,8 @@ func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
-	// Check the signed releases for a newer version and install it. The
-	// update window and its notes follow the app's language.
-	mygo.Updater.SetSource(localizedFeed{base: updateFeed, locale: mygo.App.Locale})
+	// Check the signed releases for a newer version and install it. Each
+	// update window speaks the language the app shows when its check begins.
 	mygo.Use(native.Plugin)
 	a := app.New()
 	mygo.App.OnSecondInstance(func([]string, string) { a.Focus() })

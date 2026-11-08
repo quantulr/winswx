@@ -47,7 +47,7 @@ go tool mygo i18n check
 
 **日志** — `logs.go` 只读取文件末尾 64KB，并丢弃截断的半行。标准文件顺序是 `<名称>.wrapper.log`、`.out.log`、`.err.log`，之后是其他 `.log`；默认选 wrapper.log。分段控件由 `ui.SegmentedBase` 构建并居中，不存在的文件禁用，一个日志都没有时隐藏；内容区使用固定高度，切换文件不会改变对话框高度。
 
-**国际化** — 主界面的用户可见字符串都来自 `internal/locales`；修改时同时改 `en.json` 和 `zh-Hans.json`，再运行 `go tool mygo generate`。`catalog_gen.go` 是生成文件，不要手改。消息使用 ICU MessageFormat，避免在消息里使用反斜杠。自动更新窗口直接使用 MyGo 内置翻译并跟随 `App.Locale`；`cmd/winswx/updatefeed.go` 包装更新清单，按同一语言选择 `CHANGELOG.md` 中的 `### 中文` 或 `### English` 小节。`updateFeed` 常量必须与 `mygo.json` 的 `updates.github` 对应。
+**国际化** — 主界面的用户可见字符串都来自 `internal/locales`；修改时同时改 `en.json` 和 `zh-Hans.json`，再运行 `go tool mygo generate`。`catalog_gen.go` 是生成文件，不要手改。消息使用 ICU MessageFormat，避免在消息里使用反斜杠。自动更新窗口直接使用 MyGo 内置翻译并跟随 `App.Locale`（每次检查开始时确定语言）；更新说明取自 `CHANGELOG.md` 中对应版本的小节（中文）。
 
 **Windows 细节** — `exec_windows.go` 的 `hideWindow` 使用 `CREATE_NO_WINDOW` + `HideWindow`，防止 WinSW 的控制台窗口闪现；`exec_other.go` 提供非 Windows 的空实现。安装、启动和停止服务需要管理员权限，应用不会自行提权。
 
@@ -57,7 +57,7 @@ go tool mygo i18n check
 
 - `.github/workflows/ci.yml`：push/PR 在 windows-latest 上拉取 WinSW，运行 `go vet ./...` 和 `go test ./...`。
 - `.github/workflows/release.yml`：推送 `v*` tag 时创建 draft release，并用 `go tool mygo build -platform windows/amd64 -upload` 构建、签名和上传；手动触发只构建未签名 artifact。
-- 先改 `mygo.json` 的 `version`，并在 `CHANGELOG.md` 中添加该版本的 `## <version>` 小节，其中用 `### 中文` 和 `### English` 分语言；更新窗口会显示当前语言的小节。更新日志只写用户能感知的更改，重构、依赖升级等内部改动不要写入。缺少版本小节时签名构建会失败。再提交、打 tag（`vX.Y.Z`）并推送。
+- 先改 `mygo.json` 的 `version`，并在 `CHANGELOG.md` 中添加该版本的 `## <version>` 小节（中文）；更新窗口会显示该小节。更新日志只写用户能感知的更改，重构、依赖升级等内部改动不要写入。缺少版本小节时签名构建会失败。再提交、打 tag（`vX.Y.Z`）并推送。
 - 更新签名私钥保存在仓库 secret `MYGO_UPDATER_PRIVATE_KEY` 中，必须与 `mygo.json` 的 `updates.publicKey` 配对；私钥不要提交。仓库 secret 由用户设置。
 - 工作流成功后发布 draft：`gh release edit vX.Y.Z --draft=false`。
 - 更新源为 `https://github.com/quantulr/winswx/releases/latest/download/update-windows-amd64.json`。
