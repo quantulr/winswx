@@ -544,11 +544,11 @@ func (msgs Messages) FirewallNoticeTitle() string {
 	return Catalog.Format(msgs.locale, "firewallNoticeTitle", nil)
 }
 
-// FirewallNoticeMessage says "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change …"
+// FirewallNoticeMessage says "If a service accepts connections from other computers, run the service's executable manually once and Windows will as…"
 // in the language the app shows.
 func FirewallNoticeMessage() string { return In(i18n.Locale()).FirewallNoticeMessage() }
 
-// FirewallNoticeMessage says "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change …"
+// FirewallNoticeMessage says "If a service accepts connections from other computers, run the service's executable manually once and Windows will as…"
 // in the language of msgs.
 func (msgs Messages) FirewallNoticeMessage() string {
 	return Catalog.Format(msgs.locale, "firewallNoticeMessage", nil)

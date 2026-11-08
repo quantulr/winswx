@@ -51,7 +51,7 @@
   "logsTruncated": "仅显示最近 64 KB。",
   "close": "关闭",
   "firewallNoticeTitle": "防火墙设置",
-  "firewallNoticeMessage": "如果服务需要接受来自其他电脑的连接，请在 Windows 防火墙中为它添加放行规则。winswx 不会修改防火墙设置。",
+  "firewallNoticeMessage": "如果服务需要接受来自其他电脑的连接，可以先手动运行一次该服务的可执行文件，Windows 会自动弹出允许对话框；也可以在 Windows 防火墙中手动添加放行规则。winswx 不会修改防火墙设置。",
   "firewallNoticeAction": "打开防火墙设置",
   "gotIt": "知道了"
 }

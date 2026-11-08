@@ -51,7 +51,7 @@
   "logsTruncated": "Showing the last 64 KB.",
   "close": "Close",
   "firewallNoticeTitle": "Firewall settings",
-  "firewallNoticeMessage": "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change firewall settings.",
+  "firewallNoticeMessage": "If a service accepts connections from other computers, run the service's executable manually once and Windows will ask whether to allow it through the firewall. You can also add a rule in Windows Firewall yourself. winswx does not change firewall settings.",
   "firewallNoticeAction": "Open Firewall Settings",
   "gotIt": "Got it"
 }
