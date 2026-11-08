@@ -533,3 +533,43 @@ func Close() string { return In(i18n.Locale()).Close() }
 func (msgs Messages) Close() string {
 	return Catalog.Format(msgs.locale, "close", nil)
 }
+
+// FirewallNoticeTitle says "Firewall settings"
+// in the language the app shows.
+func FirewallNoticeTitle() string { return In(i18n.Locale()).FirewallNoticeTitle() }
+
+// FirewallNoticeTitle says "Firewall settings"
+// in the language of msgs.
+func (msgs Messages) FirewallNoticeTitle() string {
+	return Catalog.Format(msgs.locale, "firewallNoticeTitle", nil)
+}
+
+// FirewallNoticeMessage says "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change …"
+// in the language the app shows.
+func FirewallNoticeMessage() string { return In(i18n.Locale()).FirewallNoticeMessage() }
+
+// FirewallNoticeMessage says "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change …"
+// in the language of msgs.
+func (msgs Messages) FirewallNoticeMessage() string {
+	return Catalog.Format(msgs.locale, "firewallNoticeMessage", nil)
+}
+
+// FirewallNoticeAction says "Open Firewall Settings"
+// in the language the app shows.
+func FirewallNoticeAction() string { return In(i18n.Locale()).FirewallNoticeAction() }
+
+// FirewallNoticeAction says "Open Firewall Settings"
+// in the language of msgs.
+func (msgs Messages) FirewallNoticeAction() string {
+	return Catalog.Format(msgs.locale, "firewallNoticeAction", nil)
+}
+
+// GotIt says "Got it"
+// in the language the app shows.
+func GotIt() string { return In(i18n.Locale()).GotIt() }
+
+// GotIt says "Got it"
+// in the language of msgs.
+func (msgs Messages) GotIt() string {
+	return Catalog.Format(msgs.locale, "gotIt", nil)
+}

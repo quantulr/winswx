@@ -51,7 +51,7 @@ go tool mygo i18n check
 
 **Windows 细节** — `exec_windows.go` 的 `hideWindow` 使用 `CREATE_NO_WINDOW` + `HideWindow`，防止 WinSW 的控制台窗口闪现；`exec_other.go` 提供非 Windows 的空实现。安装、启动和停止服务需要管理员权限，应用不会自行提权。
 
-**数据目录** — 应用只使用 `%AppData%\winswx`（`bin\winsw.exe` 与 `services\<名称>\`）。旧 Tauri 数据目录 `%AppData%\com.quantulr.winswx` 不做迁移，保持不动。
+**数据目录** — 应用只使用 `%AppData%\winswx`（`bin\winsw.exe`、`services\<名称>\`，以及标记已显示首次防火墙提示的 `firewall-notice`）。旧 Tauri 数据目录 `%AppData%\com.quantulr.winswx` 不做迁移，保持不动。
 
 ## 发布
 

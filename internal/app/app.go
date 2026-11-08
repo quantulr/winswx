@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -19,6 +20,7 @@ import (
 // after Window.Update, and while something animates.
 type App struct {
 	dir      string          // the services directory, in the user data directory
+	dataDir  string          // the user data directory, "" when unavailable
 	services []service       // the directories in dir: a service each
 	winsw    string          // the bundled WinSW executable, "" when it is missing
 	busy     map[string]bool // the services with a WinSW command running
@@ -27,30 +29,31 @@ type App struct {
 	win      *mygo.Window    // the window, nil before it is made
 	queryGen int             // counts status queries, so a stale one is ignored
 
-	dialog        dialogMode // the dialog that shows, none when closed
-	editDir       string     // the directory of the service being edited
-	moreName      string     // the service whose More menu is open
-	moreOpen      bool       // the More menu is built
-	moreTarget    float32    // 1 shown, 0 closing
-	moreFresh     bool       // seed the opening animation
-	deleting      string     // the service asked about for deletion
-	confirmDelete bool       // the delete alert shows
-	logsDir       string     // the service whose logs the dialog shows
-	logsOptions   []string   // the log files the segmented control offers
-	logsExisting  []bool     // whether each option's file exists
-	logsFile      string     // the log file shown
-	logsText      string     // its tail
-	logsTrunc     bool       // the tail is not the whole file
-	logsErr       string     // why the logs could not be read
-	logsTab       int        // the log chosen in the segmented control
-	logsScroll    ui.ScrollState
-	dlgOpen       bool    // DialogBase's open flag
-	dlgTarget     float32 // 1 shown, 0 closing
-	dlgFresh      bool    // seed the opening animation
-	newName       string  // the name in the dialog
-	newExe        string  // the executable in the dialog
-	newArgs       string  // the arguments in the dialog
-	dlgErr        string  // why the dialog could not be saved
+	dialog         dialogMode // the dialog that shows, none when closed
+	editDir        string     // the directory of the service being edited
+	moreName       string     // the service whose More menu is open
+	moreOpen       bool       // the More menu is built
+	moreTarget     float32    // 1 shown, 0 closing
+	moreFresh      bool       // seed the opening animation
+	deleting       string     // the service asked about for deletion
+	confirmDelete  bool       // the delete alert shows
+	firewallNotice bool       // the first-run firewall notice shows
+	logsDir        string     // the service whose logs the dialog shows
+	logsOptions    []string   // the log files the segmented control offers
+	logsExisting   []bool     // whether each option's file exists
+	logsFile       string     // the log file shown
+	logsText       string     // its tail
+	logsTrunc      bool       // the tail is not the whole file
+	logsErr        string     // why the logs could not be read
+	logsTab        int        // the log chosen in the segmented control
+	logsScroll     ui.ScrollState
+	dlgOpen        bool    // DialogBase's open flag
+	dlgTarget      float32 // 1 shown, 0 closing
+	dlgFresh       bool    // seed the opening animation
+	newName        string  // the name in the dialog
+	newExe         string  // the executable in the dialog
+	newArgs        string  // the arguments in the dialog
+	dlgErr         string  // why the dialog could not be saved
 }
 
 // winswExe returns the path of the WinSW executable that ships with the
@@ -67,8 +70,10 @@ func winswExe() (string, error) {
 // missing, then lists the directories in it. Each directory is a service.
 // The statuses are queried in the background.
 func (a *App) load() {
+	a.dataDir = ""
 	userData, err := mygo.App.Path(mygo.PathUserData)
 	if err == nil {
+		a.dataDir = userData
 		a.dir = filepath.Join(userData, "services")
 		err = os.MkdirAll(a.dir, 0o755)
 	}
@@ -255,6 +260,9 @@ func firstLine(s string) string {
 func New() *App {
 	a := &App{}
 	a.load()
+	if runtime.GOOS == "windows" && a.err == nil {
+		a.firewallNotice = !a.firewallNoticeSeen()
+	}
 	return a
 }
 

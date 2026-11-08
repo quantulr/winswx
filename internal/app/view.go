@@ -169,6 +169,7 @@ func (a *App) view(c *ui.Context) {
 	})
 	a.dialogView(c)
 	a.deleteAlert(c)
+	a.firewallNoticeAlert(c)
 }
 
 // serviceCard draws a service as a card in the grid, with its first

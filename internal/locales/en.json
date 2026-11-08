@@ -49,5 +49,9 @@
   "noLogs": "No log files yet.",
   "logsEmpty": "(empty)",
   "logsTruncated": "Showing the last 64 KB.",
-  "close": "Close"
+  "close": "Close",
+  "firewallNoticeTitle": "Firewall settings",
+  "firewallNoticeMessage": "If a service accepts connections from other computers, add a rule for it in Windows Firewall. winswx does not change firewall settings.",
+  "firewallNoticeAction": "Open Firewall Settings",
+  "gotIt": "Got it"
 }
